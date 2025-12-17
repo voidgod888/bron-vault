@@ -242,4 +242,3 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
     </div>
   )
 }
-

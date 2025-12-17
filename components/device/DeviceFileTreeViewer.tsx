@@ -403,10 +403,9 @@ export function DeviceFileTreeViewer({
           </span>
         </div>
         <div className="mt-1 text-xs text-amber-500">
-          Note: Binary files are available via "Download All Data" button above
+          Note: Binary files are available via &quot;Download All Data&quot; button above
         </div>
       </div>
     </div>
   )
 }
-

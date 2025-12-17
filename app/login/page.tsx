@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, Mail, User, ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -197,9 +198,11 @@ export default function LoginPage() {
             {/* Logo */}
             <div className="relative z-10">
               <div className="absolute -inset-4 bg-red-500/20 rounded-full blur-2xl animate-pulse" />
-              <img
+              <Image
                 src="/images/logo.png"
                 alt="broń Vault Logo"
+                width={96}
+                height={96}
                 className="relative w-24 h-auto drop-shadow-[0_0_25px_rgba(239,68,68,0.4)]"
               />
             </div>
@@ -241,9 +244,11 @@ export default function LoginPage() {
           <div className="flex flex-col items-center justify-center gap-3 mb-2">
             <div className="relative">
               <div className="absolute -inset-2 bg-red-500/20 rounded-full blur-xl animate-pulse" />
-              <img
+              <Image
                 src="/images/logo.png"
                 alt="broń Vault Logo"
+                width={64}
+                height={64}
                 className="relative w-16 h-auto drop-shadow-[0_0_15px_rgba(239,68,68,0.4)]"
               />
             </div>
@@ -431,4 +436,4 @@ export default function LoginPage() {
       `}</style>
     </div>
   );
-} 
+}

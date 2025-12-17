@@ -91,6 +91,7 @@ export async function processFileUploadFromPath(
   sessionId: string,
   logWithBroadcast: (message: string, type?: "info" | "success" | "warning" | "error") => void,
   deleteAfterProcessing: boolean = false,
+  sourceId: number | null = null,
 ): Promise<FileUploadResult> {
   try {
     await initializeDatabase()
@@ -136,7 +137,7 @@ export async function processFileUploadFromPath(
       logWithBroadcast("🚀 Starting ZIP stream processing...", "info")
       try {
         // Panggil fungsi baru yang berbasis Stream/Yauzl
-        processingResult = await processZipStream(filePath, uploadBatch, logWithBroadcast)
+        processingResult = await processZipStream(filePath, uploadBatch, logWithBroadcast, sourceId)
         logWithBroadcast("✅ ZIP processing completed successfully", "success")
       } catch (processError) {
         const errorMsg = processError instanceof Error ? processError.message : String(processError)
@@ -187,7 +188,7 @@ export async function processFileUploadFromPath(
       // Process the zip file with enhanced binary file storage
       logWithBroadcast("🚀 Starting ZIP processing with JSZip...", "info")
       try {
-        processingResult = await processZipWithBinaryStorage(bytes, uploadBatch, logWithBroadcast)
+        processingResult = await processZipWithBinaryStorage(bytes, uploadBatch, logWithBroadcast, sourceId)
         logWithBroadcast("✅ ZIP processing completed successfully", "success")
       } catch (processError) {
         const errorMsg = processError instanceof Error ? processError.message : String(processError)

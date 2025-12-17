@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { SavedSearches } from "@/components/search/saved-searches"
 
 interface ReconSearchBarProps {
   onSearch: (query: string, searchType: "domain" | "keyword", keywordMode?: "domain-only" | "full-url") => void
@@ -105,7 +106,19 @@ export function ReconSearchBar({
               </p>
             </div>
             {/* Main Search Component with Enhanced UI */}
-            <div className="relative group w-full">
+            <div className="relative group w-full flex flex-col gap-4">
+              <div className="w-full flex justify-end">
+                <SavedSearches
+                  onSelectSearch={(q, t) => {
+                    setQuery(q);
+                    detectSearchType(q);
+                    onSearch(q, t);
+                  }}
+                  currentQuery={query}
+                  currentType={searchType}
+                />
+              </div>
+
               <div
                 className="flex items-center w-full rounded-lg border border-border/50 glass-card transition-all duration-200 shadow-sm"
               >
