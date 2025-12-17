@@ -57,7 +57,7 @@ const maskPassword = (password: string) => {
 }
 
 // --- Copyable Cell Component with hover effect and copy functionality ---
-// FIX: Moved outside component to prevent remounting and UX bugs
+// Moved outside component to prevent remounting and UX bugs
 const CopyableCell = ({ 
   content, 
   label, 
