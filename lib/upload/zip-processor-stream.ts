@@ -221,6 +221,7 @@ export async function processZipStream(
   filePath: string,
   uploadBatch: string,
   logWithBroadcast: (message: string, type?: "info" | "success" | "warning" | "error") => void,
+  sourceId: number | null = null,
 ): Promise<ProcessingResult> {
   let zipfile2: yauzl.ZipFile | null = null
   try {
@@ -433,6 +434,7 @@ export async function processZipStream(
         uploadBatch,
         extractionBaseDir,
         logWithBroadcast,
+        sourceId,
       )
 
       for (const zipFile of zipFiles) {

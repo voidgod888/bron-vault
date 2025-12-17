@@ -30,6 +30,7 @@ export async function processZipWithBinaryStorage(
   arrayBuffer: ArrayBuffer,
   uploadBatch: string,
   logWithBroadcast: (message: string, type?: "info" | "success" | "warning" | "error") => void,
+  sourceId: number | null = null,
 ): Promise<ProcessingResult> {
   try {
     const fileSizeMB = (arrayBuffer.byteLength / (1024 * 1024)).toFixed(2)
@@ -197,6 +198,7 @@ export async function processZipWithBinaryStorage(
         uploadBatch,
         extractionBaseDir,
         logWithBroadcast,
+        sourceId,
       )
 
       // Count files (non-directory entries)
