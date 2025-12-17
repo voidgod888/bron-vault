@@ -62,6 +62,12 @@ const menuGroups = [
         icon: Upload,
       },
       {
+        title: "Sources",
+        description: "Manage Data Sources",
+        url: "/dashboard/sources",
+        icon: Globe,
+      },
+      {
         title: "Debug ZIP",
         description: "Validate ZIP Files",
         url: "/debug-zip",
