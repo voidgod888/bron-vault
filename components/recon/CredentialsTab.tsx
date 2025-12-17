@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Key, Eye, EyeOff, Globe, User, Lock, Calendar, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Copy, HardDrive } from "lucide-react"
-import { LoadingState } from "@/components/ui/loading"
+import { LoadingState, LoadingTable } from "@/components/ui/loading"
 import {
   Select,
   SelectContent,
@@ -57,7 +57,7 @@ const maskPassword = (password: string) => {
 }
 
 // --- Copyable Cell Component with hover effect and copy functionality ---
-// Moved outside component to prevent remounting and UX bugs
+// FIX: Moved outside component to prevent remounting and UX bugs
 const CopyableCell = ({ 
   content, 
   label, 
@@ -145,9 +145,13 @@ export function CredentialsTab({ targetDomain, searchType = 'domain', keywordMod
     if (page !== 1) {
       setPage(1)
     }
-  }, [limit, page]) // Added page to dependencies, although logic implies reset if limit changes.
+  }, [limit])
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    loadData()
+  }, [targetDomain, page, sortBy, sortOrder, searchQuery, limit, searchType, keywordMode])
+
+  const loadData = async () => {
     if (!targetDomain || !targetDomain.trim()) {
       console.warn("⚠️ No target domain provided")
       setIsLoading(false)
@@ -183,6 +187,19 @@ export function CredentialsTab({ targetDomain, searchType = 'domain', keywordMod
 
       if (response.ok) {
         const result = await response.json()
+        console.log("📥 Credentials data received:", {
+          credentials: result.credentials?.length || 0,
+          pagination: result.pagination,
+          success: result.success,
+          targetDomain: result.targetDomain,
+          sample: result.credentials?.slice(0, 2),
+          sampleUsernames: result.credentials?.slice(0, 5).map((c: any) => ({
+            id: c.id,
+            username: c.username,
+            url: c.url?.substring(0, 50)
+          })),
+          fullResult: result,
+        })
         
         if (result.success && Array.isArray(result.credentials)) {
           // Debug: Check username values before setting data
@@ -223,11 +240,8 @@ export function CredentialsTab({ targetDomain, searchType = 'domain', keywordMod
     } finally {
       setIsLoading(false)
     }
-  }, [targetDomain, page, sortBy, sortOrder, searchQuery, limit, searchType, keywordMode])
+  }
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
 
   const handleSort = (column: 'created_at' | 'url' | 'username' | 'log_date' | 'device_id') => {
     if (sortBy === column) {

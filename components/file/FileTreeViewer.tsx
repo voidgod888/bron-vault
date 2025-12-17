@@ -273,7 +273,7 @@ export function FileTreeViewer({ selectedDevice, onFileClick, onDownloadAllData 
           <span className="flex items-center"><Book className="inline h-4 w-4 text-amber-500 mr-1" /> = Presentation</span>
         </div>
         <div className="mt-1 text-xs text-amber-500">
-          Note: Binary files are available via &quot;Download All Data&quot; button above
+          Note: Binary files are available via "Download All Data" button above
         </div>
       </div>
     </div>

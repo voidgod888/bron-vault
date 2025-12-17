@@ -235,7 +235,7 @@ export function SearchResults({
       {/* Header - only show count if we have results or finished loading */}
       {(!isLoading && (searchResults.length > 0 || totalDevices > 0)) && (
         <h2 className="text-lg font-semibold text-foreground">
-          Found {displayCount.toLocaleString()} device instance(s) containing &quot;{searchQuery}&quot;
+          Found {displayCount.toLocaleString()} device instance(s) containing "{searchQuery}"
           {searchResults.length < displayCount && (
             <span className="text-sm text-muted-foreground font-normal ml-2">
               (showing {searchResults.length.toLocaleString()})
@@ -249,7 +249,7 @@ export function SearchResults({
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
           <h2 className="text-lg font-semibold text-foreground">
-            Searching for devices containing &quot;{searchQuery}&quot;...
+            Searching for devices containing "{searchQuery}"...
           </h2>
         </div>
       )}
@@ -257,7 +257,7 @@ export function SearchResults({
       {/* Show existing results while loading more */}
       {isLoading && searchResults.length > 0 && (
         <h2 className="text-lg font-semibold text-foreground">
-          Found {displayCount.toLocaleString()} device instance(s) containing &quot;{searchQuery}&quot;
+          Found {displayCount.toLocaleString()} device instance(s) containing "{searchQuery}"
           {searchResults.length < displayCount && (
             <span className="text-sm text-muted-foreground font-normal ml-2">
               (showing {searchResults.length.toLocaleString()})
@@ -280,7 +280,7 @@ export function SearchResults({
                   className="glass border-primary/30 text-primary"
                 >
                   <Copy className="h-3 w-3 mr-1" />
-                  {devices.length} instances of &quot;{deviceName}&quot;
+                  {devices.length} instances of "{deviceName}"
                 </Badge>
               </div>
             )}

@@ -1,162 +1,208 @@
-import { TelegramClient } from "telegram"
-import { StringSession } from "telegram/sessions"
-import { executeQuery, initializeDatabase } from "../lib/mysql"
-import { processFileUploadFromPath } from "../lib/upload/file-upload-processor"
-import { telegramConfig } from "../lib/telegram-config"
-import fs from "fs"
-import path from "path"
-import { promisify } from "util"
-import { pipeline } from "stream"
-import input from "input" // Optional, for CLI interaction if needed
-// @ts-ignore
-import mime from "mime-types"
+import { TelegramClient } from "telegram";
+import { StringSession } from "telegram/sessions";
+import { NewMessage } from "telegram/events";
+import { Api } from "telegram/tl";
+import { settingsManager, SETTING_KEYS } from "../lib/settings";
+import { processFileUploadFromPath } from "../lib/upload/file-upload-processor";
+import * as fs from "fs";
+import * as path from "path";
+import { ensureAppSettingsTable } from "../lib/mysql";
 
-const streamPipeline = promisify(pipeline)
+// Logger helper
+const log = (message: string, type: "info" | "success" | "warning" | "error" = "info") => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] [${type.toUpperCase()}] ${message}`);
+};
 
-async function getSources() {
-  return await executeQuery("SELECT * FROM sources WHERE enabled = TRUE AND type = 'telegram'") as any[]
-}
+class TelegramScraper {
+  private client: TelegramClient | null = null;
+  private isRunning = false;
+  private bytesDownloaded = 0;
+  private lastResetTime = Date.now();
+  private readonly DOWNLOAD_LIMIT = 100 * 1024 * 1024 * 1024; // 100 GB
+  private readonly RESET_INTERVAL = 60 * 60 * 1000; // 1 hour
 
-async function updateLastScraped(id: number) {
-  await executeQuery("UPDATE sources SET last_scraped_at = NOW() WHERE id = ?", [id])
-}
+  constructor() {}
 
-async function downloadMedia(client: TelegramClient, message: any, downloadDir: string): Promise<string | null> {
-  try {
-      if (!message.media) return null
-
-      const buffer = await client.downloadMedia(message, {
-          workers: 1,
-      })
-
-      if (!buffer) return null
-
-      let fileName = "unknown"
-      // Try to get filename from attributes
-      if (message.media.document && message.media.document.attributes) {
-          for (const attr of message.media.document.attributes) {
-              if (attr.className === "DocumentAttributeFilename") {
-                  fileName = attr.fileName
-                  break
-              }
-          }
-      }
-
-      // If no filename, generate one based on mime type or date
-      if (fileName === "unknown") {
-          const ext = mime.extension(message.media.document?.mimeType) || "bin"
-          fileName = `file_${message.id}.${ext}`
-      }
-
-      const filePath = path.join(downloadDir, fileName)
-      await fs.promises.writeFile(filePath, buffer)
-      return filePath
-
-  } catch (error) {
-      console.error(`Failed to download media for message ${message.id}:`, error)
-      return null
-  }
-}
-
-async function main() {
-  console.log("🚀 Starting Telegram Scraper...")
-
-  // 1. Initialize DB
-  await initializeDatabase()
-
-  // 2. Load Config
-  const config = await telegramConfig.getConfig()
-  if (!config.apiId || !config.apiHash || !config.session) {
-    console.error("❌ Telegram not configured. Please configure it in the dashboard.")
-    process.exit(1)
-  }
-
-  // 3. Connect to Telegram
-  const client = new TelegramClient(new StringSession(config.session), Number(config.apiId), config.apiHash, {
-    connectionRetries: 5,
-  })
-
-  await client.connect()
-  console.log("✅ Connected to Telegram")
-
-  // 4. Get Sources
-  const sources = await getSources()
-  console.log(`📋 Found ${sources.length} active sources`)
-
-  // Ensure download directory exists
-  const downloadDir = path.join(process.cwd(), "downloads_temp")
-  if (!fs.existsSync(downloadDir)) {
-      fs.mkdirSync(downloadDir, { recursive: true })
-  }
-
-  // 5. Iterate Sources
-  for (const source of sources) {
-    console.log(`\n🔍 Scraping source: ${source.name} (${source.identifier})`)
+  async start() {
+    if (this.isRunning) {
+      log("Scraper is already running", "warning");
+      return;
+    }
 
     try {
-        // Resolve entity (channel/user)
-        const entity = await client.getEntity(source.identifier)
+      await ensureAppSettingsTable();
 
-        // Fetch messages (limit to last 50 for now, or use last_scraped_at logic in future)
-        // Ideally we should store the last message ID processed per source to avoid duplicates.
-        // For now, we rely on the file hash check in the upload processor to avoid re-processing.
-        const messages = await client.getMessages(entity, { limit: 20 })
+      const enabled = await settingsManager.getSettingBoolean(SETTING_KEYS.TELEGRAM_SCRAPER_ENABLED, false);
+      if (!enabled) {
+        log("Telegram scraper is disabled in settings. Exiting...", "info");
+        return;
+      }
 
-        console.log(`   Found ${messages.length} messages`)
+      log("Starting Telegram Scraper...", "info");
 
-        for (const message of messages) {
-            // Check if message has file
-            if (message.media && message.media.document) {
-                const mimeType = message.media.document.mimeType
-                const isZip = mimeType === "application/zip" || mimeType === "application/x-zip-compressed"
-                const isTxt = mimeType === "text/plain"
+      // Load settings
+      const apiId = await settingsManager.getSettingString(SETTING_KEYS.TELEGRAM_API_ID);
+      const apiHash = await settingsManager.getSettingString(SETTING_KEYS.TELEGRAM_API_HASH);
+      const sessionString = await settingsManager.getSettingString(SETTING_KEYS.TELEGRAM_SESSION);
+      const channelsStr = await settingsManager.getSettingString(SETTING_KEYS.TELEGRAM_CHANNELS);
 
-                if (isZip || isTxt) {
-                    console.log(`   ⬇️ Downloading message ${message.id}...`)
-                    const filePath = await downloadMedia(client, message, downloadDir)
+      if (!apiId || !apiHash || !sessionString) {
+        log("Missing Telegram credentials. Please configure them in Settings.", "error");
+        return;
+      }
 
-                    if (filePath) {
-                        console.log(`   📦 Processing ${path.basename(filePath)}...`)
-
-                        // Define a logger for the processor
-                        const logger = (msg: string, type: any) => console.log(`      [Processor] ${type?.toUpperCase() || 'INFO'}: ${msg}`)
-
-                        // Process the file
-                        // Note: processFileUploadFromPath expects a ZIP. If text file, we might need to zip it or handle separately.
-                        // The current requirement mentions "Both zip and text file".
-                        // processFileUploadFromPath checks for .zip extension.
-
-                        if (filePath.toLowerCase().endsWith(".zip")) {
-                             await processFileUploadFromPath(
-                                filePath,
-                                path.basename(filePath),
-                                "telegram_scraper",
-                                logger,
-                                true, // Delete after processing
-                                source.id // Pass source ID
-                            )
-                        } else {
-                            console.log("      ⚠️ Non-zip files not yet fully supported by processor directly (needs packing). Skipping for now.")
-                            // TODO: Implement text file handling (e.g. read and insert directly or wrap in zip)
-                            // For now we just skip non-zips to be safe with existing processor.
-                            // Actually, let's delete the temp file
-                            fs.unlinkSync(filePath)
-                        }
-                    }
-                }
-            }
+      // Initialize client
+      this.client = new TelegramClient(
+        new StringSession(sessionString),
+        Number(apiId),
+        apiHash,
+        {
+          connectionRetries: 5,
         }
+      );
 
-        await updateLastScraped(source.id)
+      await this.client.connect();
+      log("Connected to Telegram!", "success");
+
+      // Load throttling state
+      this.bytesDownloaded = await settingsManager.getSettingNumber(SETTING_KEYS.TELEGRAM_BYTES_DOWNLOADED, 0);
+      this.lastResetTime = await settingsManager.getSettingNumber(SETTING_KEYS.TELEGRAM_LAST_RESET_TIME, Date.now());
+
+      // Parse channels
+      const channels = channelsStr
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0);
+
+      if (channels.length === 0) {
+        log("No channels configured. Waiting for configuration...", "warning");
+      } else {
+        log(`Monitoring channels: ${channels.join(", ")}`, "info");
+
+        // Add event handler
+        this.client.addEventHandler(
+          (event) => this.handleNewMessage(event),
+          new NewMessage({ chats: channels })
+        );
+      }
+
+      this.isRunning = true;
+
+      // Keep process alive
+      // In a real script, we might need a better way to keep it running if the client disconnects
+      // but TelegramClient usually handles reconnection.
 
     } catch (error) {
-        console.error(`❌ Error scraping ${source.name}:`, error)
+      log(`Failed to start scraper: ${error}`, "error");
+      process.exit(1);
     }
   }
 
-  console.log("\n✅ Scraping cycle complete.")
-  // In a real loop, we would wait here. For now, exit.
-  process.exit(0)
+  private async handleNewMessage(event: any) {
+    try {
+      const message = event.message;
+
+      if (!message || !message.file) {
+        return;
+      }
+
+      // Check throttling
+      this.checkThrottling();
+      if (this.bytesDownloaded >= this.DOWNLOAD_LIMIT) {
+        log("Download limit reached (100GB/hour). Skipping download.", "warning");
+        return;
+      }
+
+      // Check file type
+      const mimeType = message.file.mimeType || "";
+      const fileName = message.file.name || "unknown";
+
+      if (!fileName.endsWith(".zip") && !fileName.endsWith(".rar") && !mimeType.includes("zip")) {
+        // Only interested in archives
+        return;
+      }
+
+      log(`Found file: ${fileName} in ${message.chatId}`, "info");
+
+      // Download file
+      const buffer = await this.client?.downloadMedia(message, {});
+
+      if (!buffer || buffer.length === 0) {
+        log("Failed to download file or empty buffer", "error");
+        return;
+      }
+
+      // Update usage
+      this.bytesDownloaded += buffer.length;
+      await this.saveThrottlingState();
+
+      // Save to disk temporarily
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const tempFilePath = path.join(uploadsDir, `telegram_${Date.now()}_${fileName}`);
+      fs.writeFileSync(tempFilePath, buffer);
+
+      log(`Downloaded ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`, "success");
+
+      // Process file
+      log("Processing file...", "info");
+
+      // We need to define a logging callback compatible with the processor
+      const logCallback = (msg: string, type: "info" | "success" | "warning" | "error" = "info") => {
+        log(`[Processor] ${msg}`, type);
+      };
+
+      try {
+        const result = await processFileUploadFromPath(
+          tempFilePath,
+          fileName,
+          "telegram-scraper",
+          logCallback,
+          true // Delete after processing
+        );
+
+        if (result.success) {
+          log(`Successfully processed ${fileName}`, "success");
+        } else {
+          log(`Failed to process ${fileName}: ${result.error}`, "error");
+        }
+      } catch (procError) {
+        log(`Error processing file ${fileName}: ${procError}`, "error");
+      }
+
+    } catch (error) {
+      log(`Error handling message: ${error}`, "error");
+    }
+  }
+
+  private checkThrottling() {
+    const now = Date.now();
+    if (now - this.lastResetTime > this.RESET_INTERVAL) {
+      // Reset limit
+      this.bytesDownloaded = 0;
+      this.lastResetTime = now;
+      this.saveThrottlingState();
+      log("Throttling limit reset", "info");
+    }
+  }
+
+  private async saveThrottlingState() {
+    try {
+      await settingsManager.updateSetting(SETTING_KEYS.TELEGRAM_BYTES_DOWNLOADED, this.bytesDownloaded);
+      await settingsManager.updateSetting(SETTING_KEYS.TELEGRAM_LAST_RESET_TIME, this.lastResetTime);
+    } catch (error) {
+      console.error("Failed to save throttling state", error);
+    }
+  }
 }
 
-main().catch(console.error)
+// Start scraper
+const scraper = new TelegramScraper();
+scraper.start().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});

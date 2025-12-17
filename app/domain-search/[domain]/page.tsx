@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { LayoutDashboard, Globe, Key } from "lucide-react"
 import { AuthGuard } from "@/components/auth-guard"
@@ -9,9 +9,8 @@ import { ReconSummaryCards } from "@/components/recon/ReconSummaryCards"
 import { OverviewTab } from "@/components/recon/OverviewTab"
 import { SubdomainsTab } from "@/components/recon/SubdomainsTab"
 import { CredentialsTab } from "@/components/recon/CredentialsTab"
-import { NetworkInfoTab } from "@/components/recon/NetworkInfoTab"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LoadingCard } from "@/components/ui/loading"
+import { LoadingState, LoadingCard } from "@/components/ui/loading"
 
 interface SummaryStats {
   totalSubdomains: number
@@ -38,7 +37,7 @@ export default function DomainSearchPage() {
     if (tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl)
     }
-  }, [searchParams, activeTab])
+  }, [searchParams])
 
   const handleSearch = async (query: string, newSearchType: "domain" | "keyword", newKeywordMode?: "domain-only" | "full-url") => {
     if (!query || !query.trim()) return
@@ -108,7 +107,11 @@ function DomainContent({
   const [summary, setSummary] = useState<SummaryStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const loadSummary = useCallback(async () => {
+  useEffect(() => {
+    loadSummary()
+  }, [domain, searchType, keywordMode])
+
+  const loadSummary = async () => {
     setIsLoading(true)
     try {
       const body: any = { targetDomain: domain, searchType }
@@ -132,11 +135,7 @@ function DomainContent({
     } finally {
       setIsLoading(false)
     }
-  }, [domain, searchType, keywordMode])
-
-  useEffect(() => {
-    loadSummary()
-  }, [loadSummary])
+  }
 
   return (
     <div className="space-y-4">
@@ -153,7 +152,7 @@ function DomainContent({
       ) : null}
       
       <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-        <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-4 glass-card h-8">
+        <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-3 glass-card h-8">
           <TabsTrigger
             value="overview"
             className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
@@ -175,13 +174,6 @@ function DomainContent({
             <Key className="h-3 w-3 mr-1" />
             Credentials
           </TabsTrigger>
-          <TabsTrigger
-            value="network"
-            className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
-          >
-            <Globe className="h-3 w-3 mr-1" />
-            Network
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -194,10 +186,6 @@ function DomainContent({
 
         <TabsContent value="credentials" className="mt-4">
           <CredentialsTab targetDomain={domain} searchType={searchType} keywordMode={keywordMode} />
-        </TabsContent>
-
-        <TabsContent value="network" className="mt-4">
-          <NetworkInfoTab domain={domain} />
         </TabsContent>
       </Tabs>
     </div>

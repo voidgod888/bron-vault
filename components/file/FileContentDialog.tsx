@@ -2,7 +2,7 @@
 
 import React from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import Image from "next/image"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface FileContentDialogProps {
   selectedFile: { deviceId: string; filePath: string; fileName: string } | null
@@ -32,19 +32,17 @@ export function FileContentDialog({
             Device: {deviceName}
           </DialogDescription>
         </DialogHeader>
-        <div className="h-[60vh] w-full overflow-y-auto overflow-x-auto relative">
+        <div className="h-[60vh] w-full overflow-y-auto overflow-x-auto">
           {isLoadingFile ? (
             <div className="flex items-center justify-center h-32">
               <p className="text-foreground">Loading file content...</p>
             </div>
           ) : selectedFileType === 'image' ? (
-            <div className="overflow-x-auto w-full h-full relative">
-              {/* Use standard img for blob URLs created with URL.createObjectURL since Next.js Image component requires external domains to be configured or static imports */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="overflow-x-auto">
               <img 
                 src={fileContent} 
                 alt={selectedFile.fileName} 
-                className="max-w-full max-h-full object-contain mx-auto"
+                className="max-w-full max-h-full object-contain"
               />
             </div>
           ) : (

@@ -294,29 +294,6 @@ async function createTables() {
     console.log('⚠️ Could not modify log_date column:', error);
   }
 
-  // Create saved_searches table
-  await executeQuery(`
-    CREATE TABLE IF NOT EXISTS saved_searches (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      query TEXT NOT NULL,
-      search_type VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `)
-
-  // Create detection_rules table
-  await executeQuery(`
-    CREATE TABLE IF NOT EXISTS detection_rules (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      pattern TEXT NOT NULL,
-      severity ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
-      description TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `)
-
   // Create app_settings table
   await createAppSettingsTable()
 }

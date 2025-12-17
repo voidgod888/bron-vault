@@ -81,6 +81,8 @@ const HoverableCell = ({
 
 // URL Cell with copy functionality
 const UrlCell = ({ url }: { url: string }) => {
+  const displayContent = url.length > 50 ? `${url.substring(0, 50)}...` : url
+
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
@@ -362,7 +364,7 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
 
       {filteredCredentials.length === 0 && credentialsSearchQuery && (
         <div className="text-center py-8 text-muted-foreground">
-          <p>No credentials found matching &quot;{credentialsSearchQuery}&quot;</p>
+          <p>No credentials found matching "{credentialsSearchQuery}"</p>
           <Button
             variant="ghost"
             size="sm"

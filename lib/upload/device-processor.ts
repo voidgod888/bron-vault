@@ -15,7 +15,6 @@ import {
 import { isLikelyTextFile } from "./zip-structure-analyzer"
 import { chunkArray } from "@/lib/utils"
 import { settingsManager } from "@/lib/settings"
-import { pushToScannerQueue } from "@/lib/scanner-queue"
 
 export interface DeviceProcessingResult {
   deviceCredentials: number
@@ -32,7 +31,6 @@ export async function processDevice(
   uploadBatch: string,
   extractionBaseDir: string,
   logWithBroadcast: (message: string, type?: "info" | "success" | "warning" | "error") => void,
-  sourceId: number | null = null,
 ): Promise<DeviceProcessingResult> {
   // Create device-specific directory
   const deviceDir = path.join(extractionBaseDir, deviceId)
@@ -147,8 +145,8 @@ export async function processDevice(
   try {
     logWithBroadcast(`💾 Saving device record: ${deviceName}`, "info")
     await executeQuery(
-      `INSERT INTO devices (device_id, device_name, device_name_hash, upload_batch, total_files, total_credentials, total_domains, total_urls, source_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO devices (device_id, device_name, device_name_hash, upload_batch, total_files, total_credentials, total_domains, total_urls)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         deviceId,
         deviceName,
@@ -158,7 +156,6 @@ export async function processDevice(
         deviceCredentials,
         deviceDomains,
         deviceUrls,
-        sourceId,
       ],
     )
     logWithBroadcast(`✅ Device record saved: ${deviceName}`, "success")
@@ -240,9 +237,6 @@ export async function processDevice(
   const batches = chunkArray(validCredentials, credentialsBatchSize)
   logWithBroadcast(`📦 Inserting ${validCredentials.length} credentials in ${batches.length} batches (batch size: ${credentialsBatchSize})...`, "info")
   
-  // Collect unique domains for scanning
-  const domainsToScan = new Set<string>()
-
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
     const batch = batches[batchIndex]
     try {
@@ -256,9 +250,6 @@ export async function processDevice(
       // Flatten parameters array
       const params: any[] = []
       for (const cred of batch) {
-        if (cred.domain) {
-          domainsToScan.add(cred.domain)
-        }
         params.push(
           deviceId,
           cred.url,
@@ -285,18 +276,6 @@ export async function processDevice(
   }
 
   logWithBroadcast(`✅ Successfully saved ${credentialsSaved}/${allCredentials.length} credentials (${credentialsSkipped} skipped)`, "success")
-
-  // Push unique domains to scanner queue
-  if (domainsToScan.size > 0) {
-    logWithBroadcast(`🚀 Queueing ${domainsToScan.size} domains for scanning...`, "info")
-    let queuedCount = 0
-    for (const domain of domainsToScan) {
-      // Domains with credentials are "high" priority
-      pushToScannerQueue(domain, "high").catch(err => console.error("Queue error", err))
-      queuedCount++
-    }
-    logWithBroadcast(`✅ Queued ${queuedCount} domains for active scanning`, "success")
-  }
 
   // Store password stats - OPTIMIZED WITH BULK INSERT
   const passwordStatsBatchSize = batchSettings.passwordStatsBatchSize

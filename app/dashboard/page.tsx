@@ -20,7 +20,6 @@ const BrowserVerticalBarChart = nextDynamic(
 import { AuthGuard } from "@/components/auth-guard"
 import { AnimatedStatCard } from "@/components/animated-stat-card"
 import { AnimatedSoftwareList } from "@/components/animated-software-list"
-import { GeoMap } from "@/components/analytics/geo-map"
 import ErrorBoundary from "@/components/error-boundary"
 import { LoadingState, LoadingChart, LoadingCard } from "@/components/ui/loading"
 
@@ -310,12 +309,6 @@ function DashboardContent() {
               </AlertDescription>
             </Alert>
           )}
-
-          {/* Geo Map Visualization - Full Width */}
-          <div className="w-full">
-            <GeoMap />
-          </div>
-
           {/* Top Passwords */}
           <Card className="glass-card">
             <CardHeader className="!p-4 border-b border-white/5">

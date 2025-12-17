@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Globe, Link, ArrowUpDown, ArrowUp, ArrowDown, Filter, MoreHorizontal, Key } from "lucide-react"
-import { LoadingState } from "@/components/ui/loading"
+import { LoadingState, LoadingTable } from "@/components/ui/loading"
 import {
   Pagination,
   PaginationContent,
@@ -60,9 +60,13 @@ export function SubdomainsTab({ targetDomain, searchType = 'domain', keywordMode
     if (page !== 1) {
       setPage(1)
     }
-  }, [limit, page]) // Added page to dependencies, although logic implies reset if limit changes.
+  }, [limit])
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    loadData()
+  }, [targetDomain, page, sortBy, sortOrder, limit, searchType, keywordMode])
+
+  const loadData = async () => {
     setIsLoading(true)
     try {
       const body: any = {
@@ -105,11 +109,7 @@ export function SubdomainsTab({ targetDomain, searchType = 'domain', keywordMode
     } finally {
       setIsLoading(false)
     }
-  }, [targetDomain, page, sortBy, sortOrder, limit, searchType, keywordMode])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  }
 
   const filteredData = useMemo(() => {
     let filtered = data

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Settings, Save, AlertCircle, Info, Upload, Database, CloudDownload } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -128,7 +128,11 @@ function UploadConfigurationTab() {
   const [errors, setErrors] = useState<Partial<Record<keyof SettingsFormData, string>>>({})
 
   // Load settings on mount
-  const loadSettings = useCallback(async () => {
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  const loadSettings = async () => {
     try {
       setLoading(true)
       const response = await fetch("/api/settings/upload")
@@ -155,11 +159,7 @@ function UploadConfigurationTab() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
-
-  useEffect(() => {
-    loadSettings()
-  }, [loadSettings])
+  }
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof SettingsFormData, string>> = {}
@@ -453,7 +453,11 @@ function BatchConfigurationTab() {
   const [errors, setErrors] = useState<Partial<Record<keyof BatchFormData, string>>>({})
 
   // Load settings on mount
-  const loadSettings = useCallback(async () => {
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  const loadSettings = async () => {
     try {
       setLoading(true)
       const response = await fetch("/api/settings/batch")
@@ -480,11 +484,7 @@ function BatchConfigurationTab() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
-
-  useEffect(() => {
-    loadSettings()
-  }, [loadSettings])
+  }
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof BatchFormData, string>> = {}

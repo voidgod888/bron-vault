@@ -1,8 +1,8 @@
 "use client"
 export const dynamic = "force-dynamic"
 
-import React, { useState, useEffect, useCallback } from "react"
-import { Database, Folder, FileText, Eye, ImageIcon, Book, Package } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import { Database, Folder, FileText, Eye, File, ImageIcon, Book, Package } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
@@ -50,12 +50,6 @@ interface SearchResult {
   totalFiles: number
   upload_date?: string
   uploadDate?: string
-  operatingSystem?: string
-  ipAddress?: string
-  username?: string
-  hostname?: string
-  country?: string
-  filePath?: string
 }
 
 interface Credential {
@@ -70,7 +64,7 @@ interface Credential {
 
 export default function SearchPage() {
   // Use custom hooks for state management
-  const { stats, isStatsLoaded, statsError } = useStats()
+  const { stats, topPasswords, isStatsLoaded, statsError } = useStats()
   const {
     searchQuery,
     setSearchQuery,
@@ -103,9 +97,51 @@ export default function SearchPage() {
   const [selectedFileType, setSelectedFileType] = useState<'text' | 'image' | null>(null)
   const [searchActive, setSearchActive] = useState(false)
 
+  // Load device info, credentials, software, and files when device is selected and reset password visibility
+  // Use deviceId as dependency instead of entire selectedDevice object to prevent infinite loop
+  useEffect(() => {
+    if (selectedDevice?.deviceId) {
+      console.log("🔄 Device selected, loading device info, credentials, software, and files for:", selectedDevice.deviceId)
+      setShowPasswords(false) // Reset password visibility for each device
+      setCredentialsSearchQuery("") // Reset search query for each device
+      setSoftwareSearchQuery("") // Reset software search query for each device
+      loadDeviceInfo(selectedDevice.deviceId)
+      loadDeviceCredentials(selectedDevice.deviceId)
+      loadDeviceSoftware(selectedDevice.deviceId)
+      // Only load files if they haven't been loaded yet (empty array means not loaded)
+      if (!selectedDevice.files || selectedDevice.files.length === 0) {
+        loadDeviceFiles(selectedDevice.deviceId)
+      }
+    }
+  }, [selectedDevice?.deviceId]) // Only depend on deviceId, not entire object
+
+  // Prepare typing sentences for the typing effect
+  const totalCreds =
+    typeof stats.totalCredentials === "number" &&
+    isFinite(stats.totalCredentials) &&
+    !isNaN(stats.totalCredentials) &&
+    stats.totalCredentials > 0
+      ? stats.totalCredentials
+      : null
+
+  const validDevices = typeof stats.totalDevices === 'number' && !isNaN(stats.totalDevices)
+  const validFiles = typeof stats.totalFiles === 'number' && !isNaN(stats.totalFiles)
+  const validDomains = typeof stats.totalDomains === 'number' && !isNaN(stats.totalDomains)
+  const validUrls = typeof stats.totalUrls === 'number' && !isNaN(stats.totalUrls)
+  const validCreds = typeof totalCreds === 'number' && !isNaN(totalCreds)
+
+  const typingSentences = isStatsLoaded && validDevices && validFiles && validDomains && validUrls && validCreds
+    ? [
+        `${stats.totalDevices.toLocaleString()} compromised devices, ${stats.totalFiles.toLocaleString()} files extracted.`,
+        `${stats.totalDomains.toLocaleString()} total domains, ${stats.totalUrls.toLocaleString()} total urls.`,
+        `${totalCreds.toLocaleString()} records ready to query...`,
+      ]
+    : []
+
+
 
   // Load device info function (OS, IP Address, Username, Hostname, Country, Path)
-  const loadDeviceInfo = useCallback(async (deviceId: string) => {
+  const loadDeviceInfo = async (deviceId: string) => {
     console.log("🚀 Starting to load device info for device:", deviceId)
 
     try {
@@ -147,10 +183,10 @@ export default function SearchPage() {
     } catch (error) {
       console.error("❌ Failed to load device info:", error)
     }
-  }, [])
+  }
 
   // Load device credentials function
-  const loadDeviceCredentials = useCallback(async (deviceId: string) => {
+  const loadDeviceCredentials = async (deviceId: string) => {
     console.log("🚀 Starting to load credentials for device:", deviceId)
     setIsLoadingCredentials(true)
     setCredentialsError("")
@@ -191,10 +227,10 @@ export default function SearchPage() {
       setIsLoadingCredentials(false)
       console.log("🏁 Finished loading credentials")
     }
-  }, [])
+  }
 
   // Load device software function
-  const loadDeviceSoftware = useCallback(async (deviceId: string) => {
+  const loadDeviceSoftware = async (deviceId: string) => {
     console.log("🚀 Starting to load software for device:", deviceId)
     setIsLoadingSoftware(true)
     setSoftwareError("")
@@ -235,13 +271,15 @@ export default function SearchPage() {
       setIsLoadingSoftware(false)
       console.log("🏁 Finished loading software")
     }
-  }, [])
+  }
 
   // Load device files function
-  const loadDeviceFiles = useCallback(async (deviceId: string) => {
-    // Note: We cannot rely on selectedDevice.files inside useCallback without adding it to dependencies
-    // which would cause an infinite loop if we update selectedDevice.
-    // Instead, the check should happen in the useEffect or inside the functional update.
+  const loadDeviceFiles = async (deviceId: string) => {
+    // Skip if files already loaded for this device
+    if (selectedDevice?.deviceId === deviceId && selectedDevice?.files && selectedDevice.files.length > 0) {
+      console.log("⏭️ Files already loaded for device:", deviceId)
+      return
+    }
 
     console.log("🚀 Starting to load files for device:", deviceId)
 
@@ -282,48 +320,7 @@ export default function SearchPage() {
     } catch (error) {
       console.error("❌ Failed to load files:", error)
     }
-  }, [])
-
-  // Load device info, credentials, software, and files when device is selected and reset password visibility
-  // Use deviceId as dependency instead of entire selectedDevice object to prevent infinite loop
-  useEffect(() => {
-    if (selectedDevice?.deviceId) {
-      console.log("🔄 Device selected, loading device info, credentials, software, and files for:", selectedDevice.deviceId)
-      setShowPasswords(false) // Reset password visibility for each device
-      setCredentialsSearchQuery("") // Reset search query for each device
-      setSoftwareSearchQuery("") // Reset software search query for each device
-      loadDeviceInfo(selectedDevice.deviceId)
-      loadDeviceCredentials(selectedDevice.deviceId)
-      loadDeviceSoftware(selectedDevice.deviceId)
-      // Only load files if they haven't been loaded yet (empty array means not loaded)
-      if (!selectedDevice.files || selectedDevice.files.length === 0) {
-        loadDeviceFiles(selectedDevice.deviceId)
-      }
-    }
-  }, [selectedDevice?.deviceId, selectedDevice?.files, loadDeviceInfo, loadDeviceCredentials, loadDeviceSoftware, loadDeviceFiles]) // Added dependencies
-
-  // Prepare typing sentences for the typing effect
-  const totalCreds =
-    typeof stats.totalCredentials === "number" &&
-    isFinite(stats.totalCredentials) &&
-    !isNaN(stats.totalCredentials) &&
-    stats.totalCredentials > 0
-      ? stats.totalCredentials
-      : null
-
-  const validDevices = typeof stats.totalDevices === 'number' && !isNaN(stats.totalDevices)
-  const validFiles = typeof stats.totalFiles === 'number' && !isNaN(stats.totalFiles)
-  const validDomains = typeof stats.totalDomains === 'number' && !isNaN(stats.totalDomains)
-  const validUrls = typeof stats.totalUrls === 'number' && !isNaN(stats.totalUrls)
-  const validCreds = typeof totalCreds === 'number' && !isNaN(totalCreds)
-
-  const typingSentences = isStatsLoaded && validDevices && validFiles && validDomains && validUrls && validCreds
-    ? [
-        `${stats.totalDevices.toLocaleString()} compromised devices, ${stats.totalFiles.toLocaleString()} files extracted.`,
-        `${stats.totalDomains.toLocaleString()} total domains, ${stats.totalUrls.toLocaleString()} total urls.`,
-        `${totalCreds.toLocaleString()} records ready to query...`,
-      ]
-    : []
+  }
 
   // Handle search with typing effect control
   const handleSearchWithTypingControl = async () => {
@@ -432,6 +429,8 @@ export default function SearchPage() {
     }
   }
 
+
+
   const formatFileSize = (size?: number) => {
     if (!size) return ""
     if (size < 1024) return `${size} B`
@@ -439,6 +438,106 @@ export default function SearchPage() {
     return `${(size / (1024 * 1024)).toFixed(1)} MB`
   }
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
+    try {
+      // Handle MySQL datetime format 'YYYY-MM-DD HH:mm:ss'
+      let isoString = dateString
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+        isoString = dateString.replace(' ', 'T') + 'Z' // treat as UTC
+      }
+      let date = new Date(isoString)
+      if (isNaN(date.getTime())) {
+        // fallback: parse manually
+        const parts = dateString.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/)
+        if (parts) {
+          return `${parts[3]}/${parts[2]}/${parts[1]} ${parts[4]}:${parts[5]}:${parts[6]}`
+        }
+        return dateString
+      }
+      return date.toLocaleString()
+    } catch (e) {
+      return dateString
+    }
+  }
+
+  // ASCII TREE BUILDER - IntelX Style with Advanced Features
+  const buildASCIITree = (files: StoredFile[], matchingFiles: string[]): TreeNode[] => {
+    const tree: TreeNode[] = []
+    const nodeMap = new Map<string, TreeNode>()
+
+    // Sort files by path to ensure proper hierarchy
+    const sortedFiles = [...files].sort((a, b) => a.file_path.localeCompare(b.file_path))
+
+    for (const file of sortedFiles) {
+      const pathParts = file.file_path.split("/").filter((part) => part.length > 0)
+      let currentPath = ""
+
+      for (let i = 0; i < pathParts.length; i++) {
+        const part = pathParts[i]
+        const parentPath = currentPath
+        currentPath = currentPath ? `${currentPath}/${part}` : part
+        const isLastPart = i === pathParts.length - 1
+        const isDirectory = !isLastPart || file.is_directory
+
+        if (!nodeMap.has(currentPath)) {
+          // Clean the name - remove leading numbers (IntelX style)
+          let cleanName = part.replace(/^\d+[\s.-]*/, "")
+          if (!cleanName || /^[\d\s.-]*$/.test(cleanName)) {
+            cleanName = isDirectory ? "Folder" : "File"
+          }
+
+          const hasDirectMatch = isLastPart && matchingFiles.includes(file.file_path)
+
+          const node: TreeNode = {
+            name: cleanName,
+            path: currentPath,
+            isDirectory,
+            hasMatch: hasDirectMatch,
+            hasContent: isLastPart ? file.has_content : false,
+            size: isLastPart ? file.file_size : undefined,
+            children: [],
+            level: i,
+          }
+
+          nodeMap.set(currentPath, node)
+
+          // Add to parent or root
+          if (parentPath && nodeMap.has(parentPath)) {
+            const parent = nodeMap.get(parentPath)!
+            parent.children.push(node)
+          } else if (!parentPath) {
+            tree.push(node)
+          }
+        }
+      }
+    }
+
+    // Sort children within each node - Files first, then directories (IntelX style)
+    const sortChildren = (node: TreeNode) => {
+      node.children.sort((a, b) => {
+        // Files first, directories second
+        if (!a.isDirectory && b.isDirectory) return -1
+        if (a.isDirectory && !b.isDirectory) return 1
+        // Within same type, sort alphabetically
+        return a.name.localeCompare(b.name)
+      })
+      node.children.forEach(sortChildren)
+    }
+
+    tree.forEach(sortChildren)
+
+    // Sort root level - Files first, directories second
+    tree.sort((a, b) => {
+      if (!a.isDirectory && b.isDirectory) return -1
+      if (a.isDirectory && !b.isDirectory) return 1
+      return a.name.localeCompare(b.name)
+    })
+
+    return tree
+  }
+
+  // Update the file tree renderer to show visual indicators
   const renderASCIITree = (nodes: TreeNode[], isLast: boolean[] = []): React.ReactNode => {
     return nodes.map((node, index) => {
       const isLastChild = index === nodes.length - 1
@@ -550,6 +649,26 @@ export default function SearchPage() {
     })
   }
 
+  const getMatchingFileNames = (matchingFiles: string[]) => {
+    return matchingFiles.map((filePath) => {
+      const fileName = filePath.split("/").pop() || filePath
+      return fileName
+    })
+  }
+
+  const groupResultsByName = (results: SearchResult[]) => {
+    const grouped = new Map<string, SearchResult[]>()
+    results.forEach((result) => {
+      if (!grouped.has(result.deviceName)) {
+        grouped.set(result.deviceName, [])
+      }
+      grouped.get(result.deviceName)!.push(result)
+    })
+    return grouped
+  }
+
+  const groupedResults = groupResultsByName(searchResults)
+
   return (
     <TooltipProvider>
       <div className="flex flex-col min-h-screen bg-background">
@@ -601,7 +720,7 @@ export default function SearchPage() {
             {/* No results message - only show if search has been executed */}
             {hasSearched && searchResults.length === 0 && searchQuery && !isLoading && stats.totalFiles > 0 && (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No devices found containing &quot;{searchQuery}&quot;</p>
+                <p className="text-muted-foreground">No devices found containing "{searchQuery}"</p>
                 <p className="text-sm text-muted-foreground mt-2">
                   Try searching with a different email or domain name.
                 </p>
