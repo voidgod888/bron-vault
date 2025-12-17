@@ -20,6 +20,15 @@ export const SETTING_KEYS = {
   DB_BATCH_SIZE_PASSWORD_STATS: 'db_batch_size_password_stats',
   DB_BATCH_SIZE_FILES: 'db_batch_size_files',
   FILE_WRITE_PARALLEL_LIMIT: 'file_write_parallel_limit',
+  // Telegram Scraper Settings
+  TELEGRAM_API_ID: 'telegram_api_id',
+  TELEGRAM_API_HASH: 'telegram_api_hash',
+  TELEGRAM_PHONE: 'telegram_phone',
+  TELEGRAM_SESSION: 'telegram_session',
+  TELEGRAM_CHANNELS: 'telegram_channels',
+  TELEGRAM_SCRAPER_ENABLED: 'telegram_scraper_enabled',
+  TELEGRAM_BYTES_DOWNLOADED: 'telegram_bytes_downloaded',
+  TELEGRAM_LAST_RESET_TIME: 'telegram_last_reset_time',
 } as const
 
 export type SettingKey = typeof SETTING_KEYS[keyof typeof SETTING_KEYS]
