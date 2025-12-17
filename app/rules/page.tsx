@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/auth-guard";
-import { ClientLayoutWithSidebar } from "@/components/client-layout-with-sidebar";
+import ClientLayoutWithSidebar from "@/components/client-layout-with-sidebar";
 
 interface DetectionRule {
   id: number;

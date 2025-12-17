@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateRequest } from "@/lib/auth";
 import { settingsManager, SETTING_KEYS } from "@/lib/settings";
-import { authClients } from "../send-code/route";
+import { authClients } from "@/lib/telegram-auth-state";
 
 export async function POST(request: NextRequest) {
   const user = await validateRequest(request);

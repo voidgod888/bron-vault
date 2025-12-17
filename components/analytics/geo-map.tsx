@@ -64,7 +64,7 @@ export function GeoMap() {
   // Determine max value for color scaling
   const maxCount = Math.max(1, ...data.map((d) => d.count));
 
-  const colorScale = scaleLinear<string>()
+   const colorScale = scaleLinear()
     .domain([0, maxCount])
     .range(["#EAEAEC", "#EF4444"]); // Light gray to Red-500
 
@@ -82,7 +82,7 @@ export function GeoMap() {
             <ComposableMap projectionConfig={{ scale: 147 }} className="w-full h-full">
                 <ZoomableGroup>
                 <Geographies geography={GEO_URL}>
-                    {({ geographies }) =>
+                    {({ geographies }: { geographies: any[] }) =>
                     geographies.map((geo) => {
                         // geo.id is the ISO Numeric code (e.g., "840", "004")
                         // We try to match with our map

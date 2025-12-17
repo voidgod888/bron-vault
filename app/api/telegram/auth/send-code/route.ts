@@ -3,11 +3,7 @@ import { validateRequest } from "@/lib/auth";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { settingsManager, SETTING_KEYS } from "@/lib/settings";
-
-// Temporary storage for clients during auth flow
-// In a real production environment with multiple instances, this should be in Redis
-// But for a single-instance Next.js app, this global Map works for the auth flow
-const authClients = new Map<string, TelegramClient>();
+import { authClients } from "@/lib/telegram-auth-state";
 
 export async function POST(request: NextRequest) {
   const user = await validateRequest(request);
@@ -69,4 +65,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export { authClients };
+// Exporting authClients creates a conflict with Next.js route types.
+// We should move this state to a separate file or keep it internal if not needed elsewhere.
+// Since it's used in other routes, we'll move it to lib/telegram-auth-state.ts (simulated here by just NOT exporting it from route)
+// Wait, if other routes import it, removing export breaks them.
+// But Next.js complains about exporting it from a route file.
+// Correct fix: Move shared state to a separate file.

@@ -28,16 +28,16 @@ export async function GET(req: NextRequest) {
 
     // 1. Get the Central Device
     // Query systeminformation for this device
-    const deviceResult: any[] = await executeQuery(
+    const deviceResult = await executeQuery(
       `SELECT * FROM systeminformation WHERE device_id = ?`,
       [deviceId]
-    );
+    ) as any[];
 
     // Also get device name from devices table
-    const deviceMeta: any[] = await executeQuery(
+    const deviceMeta = await executeQuery(
         `SELECT device_name FROM devices WHERE device_id = ?`,
         [deviceId]
-    );
+    ) as any[];
 
     const deviceName = deviceMeta[0]?.device_name || deviceId;
 
@@ -54,10 +54,10 @@ export async function GET(req: NextRequest) {
             links.push({ source: deviceId, target: ipId, label: 'HAS_IP' });
 
             // Find other devices with this IP (Pivot 1)
-            const sameIpDevices: any[] = await executeQuery(
+            const sameIpDevices = await executeQuery(
                 `SELECT device_id, username FROM systeminformation WHERE ip_address = ? AND device_id != ? LIMIT 5`,
                 [info.ip_address, deviceId]
-            );
+            ) as any[];
 
             sameIpDevices.forEach(d => {
                 addNode(d.device_id, `Device: ${d.username || 'Unknown'}`, 'device', 15);
@@ -67,10 +67,10 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Get Top Domains for this device
-    const domainResult: any[] = await executeQuery(
+    const domainResult = await executeQuery(
         `SELECT domain, COUNT(*) as count FROM credentials WHERE device_id = ? GROUP BY domain ORDER BY count DESC LIMIT 10`,
         [deviceId]
-    );
+    ) as any[];
 
     domainResult.forEach(d => {
         if (d.domain) {
