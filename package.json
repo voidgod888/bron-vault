@@ -7,6 +7,7 @@
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
+    "scraper": "npx tsx scripts/telegram-scraper.ts",
     "migrate:dates": "npx tsx scripts/migrate-fix-and-normalize-dates.ts",
     "migrate:dates:dry-run": "DRY_RUN=true npx tsx scripts/migrate-fix-and-normalize-dates.ts"
   },
@@ -65,6 +66,7 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "telegram": "^2.26.22",
     "vaul": "^0.9.6",
     "web-vitals": "^3.5.2",
     "yauzl": "^3.2.0",

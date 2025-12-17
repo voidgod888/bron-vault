@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Settings, Save, AlertCircle, Info, Upload, Database } from "lucide-react"
+import { Settings, Save, AlertCircle, Info, Upload, Database, CloudDownload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { formatBytes } from "@/lib/utils"
+import { TelegramSettings } from "@/components/telegram-settings"
 
 interface UploadSettings {
   maxFileSize: number
@@ -73,7 +74,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-2 glass-card h-8">
+          <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-3 glass-card h-8">
             <TabsTrigger
               value="upload"
               className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
@@ -88,6 +89,13 @@ export default function SettingsPage() {
               <Database className="h-3 w-3 mr-1" />
               Database Batch
             </TabsTrigger>
+            <TabsTrigger
+              value="telegram"
+              className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
+            >
+              <CloudDownload className="h-3 w-3 mr-1" />
+              Telegram Scraper
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="upload" className="mt-4">
@@ -96,6 +104,10 @@ export default function SettingsPage() {
 
           <TabsContent value="batch" className="mt-4">
             <BatchConfigurationTab />
+          </TabsContent>
+
+          <TabsContent value="telegram" className="mt-4">
+            <TelegramSettings />
           </TabsContent>
         </Tabs>
       </div>
