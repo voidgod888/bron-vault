@@ -32,6 +32,7 @@ export async function processDevice(
   uploadBatch: string,
   extractionBaseDir: string,
   logWithBroadcast: (message: string, type?: "info" | "success" | "warning" | "error") => void,
+  sourceId: number | null = null,
 ): Promise<DeviceProcessingResult> {
   // Create device-specific directory
   const deviceDir = path.join(extractionBaseDir, deviceId)
@@ -146,8 +147,8 @@ export async function processDevice(
   try {
     logWithBroadcast(`💾 Saving device record: ${deviceName}`, "info")
     await executeQuery(
-      `INSERT INTO devices (device_id, device_name, device_name_hash, upload_batch, total_files, total_credentials, total_domains, total_urls) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO devices (device_id, device_name, device_name_hash, upload_batch, total_files, total_credentials, total_domains, total_urls, source_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         deviceId,
         deviceName,
@@ -157,6 +158,7 @@ export async function processDevice(
         deviceCredentials,
         deviceDomains,
         deviceUrls,
+        sourceId,
       ],
     )
     logWithBroadcast(`✅ Device record saved: ${deviceName}`, "success")
