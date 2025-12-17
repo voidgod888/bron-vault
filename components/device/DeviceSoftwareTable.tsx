@@ -90,34 +90,44 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
     loadSoftware()
   }, [deviceId])
 
+  // Pre-process software data for efficient filtering
+  // This avoids repetitive toLowerCase() calls and string concatenations during search/filter
+  const preparedSoftware = useMemo(() => {
+    return deviceSoftware.map(sw => ({
+      original: sw,
+      lowerName: (sw.software_name || "").toLowerCase(),
+      lowerVersion: (sw.version || "").toLowerCase(),
+      dedupKey: `${sw.software_name}|${sw.version || "N/A"}`
+    }))
+  }, [deviceSoftware])
+
   const filteredSoftware = useMemo(() => {
-    let filtered = deviceSoftware
+    let filtered = preparedSoftware
 
     // Apply search filter
     if (softwareSearchQuery.trim()) {
       const searchLower = softwareSearchQuery.toLowerCase()
       filtered = filtered.filter(
-        (sw) =>
-          sw.software_name.toLowerCase().includes(searchLower) ||
-          sw.version.toLowerCase().includes(searchLower),
+        (item) =>
+          item.lowerName.includes(searchLower) ||
+          item.lowerVersion.includes(searchLower),
       )
     }
 
     // Apply deduplication if enabled
     if (deduplicate) {
       const seen = new Set<string>()
-      filtered = filtered.filter((sw) => {
-        const key = `${sw.software_name}|${sw.version || "N/A"}`
-        if (seen.has(key)) {
+      filtered = filtered.filter((item) => {
+        if (seen.has(item.dedupKey)) {
           return false
         }
-        seen.add(key)
+        seen.add(item.dedupKey)
         return true
       })
     }
 
-    return filtered
-  }, [deviceSoftware, softwareSearchQuery, deduplicate])
+    return filtered.map(item => item.original)
+  }, [preparedSoftware, softwareSearchQuery, deduplicate])
 
   if (isLoadingSoftware) {
     return (
@@ -218,7 +228,7 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
 
       {filteredSoftware.length === 0 && softwareSearchQuery && (
         <div className="text-center py-8 text-muted-foreground">
-          <p>No software found matching "{softwareSearchQuery}"</p>
+          <p>No software found matching &quot;{softwareSearchQuery}&quot;</p>
           <Button
             variant="ghost"
             size="sm"
