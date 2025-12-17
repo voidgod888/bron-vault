@@ -9,6 +9,7 @@ import { ReconSummaryCards } from "@/components/recon/ReconSummaryCards"
 import { OverviewTab } from "@/components/recon/OverviewTab"
 import { SubdomainsTab } from "@/components/recon/SubdomainsTab"
 import { CredentialsTab } from "@/components/recon/CredentialsTab"
+import { NetworkInfoTab } from "@/components/recon/NetworkInfoTab"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LoadingCard } from "@/components/ui/loading"
 
@@ -152,7 +153,7 @@ function DomainContent({
       ) : null}
       
       <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-        <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-3 glass-card h-8">
+        <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-4 glass-card h-8">
           <TabsTrigger
             value="overview"
             className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
@@ -174,6 +175,13 @@ function DomainContent({
             <Key className="h-3 w-3 mr-1" />
             Credentials
           </TabsTrigger>
+          <TabsTrigger
+            value="network"
+            className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
+          >
+            <Globe className="h-3 w-3 mr-1" />
+            Network
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -186,6 +194,10 @@ function DomainContent({
 
         <TabsContent value="credentials" className="mt-4">
           <CredentialsTab targetDomain={domain} searchType={searchType} keywordMode={keywordMode} />
+        </TabsContent>
+
+        <TabsContent value="network" className="mt-4">
+          <NetworkInfoTab domain={domain} />
         </TabsContent>
       </Tabs>
     </div>

@@ -53,6 +53,7 @@
     "framer-motion": "^12.23.6",
     "i18n-iso-countries": "^7.14.0",
     "input-otp": "1.4.1",
+    "ioredis": "^5.8.2",
     "jszip": "^3.10.1",
     "lucide-react": "^0.454.0",
     "mysql2": "^3.6.5",
