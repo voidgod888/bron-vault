@@ -290,8 +290,17 @@ export function SearchResults({
               return (
                 <Card
                   key={result.deviceId}
-                  className="w-full cursor-pointer glass-card border-border hover:border-primary/70 transition-all duration-300"
+                  className="w-full cursor-pointer glass-card border-border hover:border-primary/70 transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                   onClick={() => onDeviceSelect(result)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View details for ${result.deviceName}`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      onDeviceSelect(result)
+                    }
+                  }}
                 >
                   <CardContent className="p-4">
                     <div className="flex flex-col gap-2">
