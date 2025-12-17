@@ -7,6 +7,7 @@ import { useTheme } from "next-themes"
 import { Sun, Moon } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import React from "react"
+import Image from "next/image"
 
 import {
   Sidebar,
@@ -118,9 +119,11 @@ export function AppSidebar() {
         <div className="flex flex-col items-center">
           <div className="relative mb-2">
             <div className="absolute -inset-1 rounded-full bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
-            <img
+            <Image
               src={logoSrc}
               alt="broń Vault Logo"
+              width={40}
+              height={40}
               className="relative h-10 w-auto"
             />
           </div>

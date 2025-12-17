@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { LayoutDashboard, Globe, Key } from "lucide-react"
 import { AuthGuard } from "@/components/auth-guard"
@@ -10,7 +10,7 @@ import { OverviewTab } from "@/components/recon/OverviewTab"
 import { SubdomainsTab } from "@/components/recon/SubdomainsTab"
 import { CredentialsTab } from "@/components/recon/CredentialsTab"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LoadingState, LoadingCard } from "@/components/ui/loading"
+import { LoadingCard } from "@/components/ui/loading"
 
 interface SummaryStats {
   totalSubdomains: number
@@ -37,7 +37,7 @@ export default function DomainSearchPage() {
     if (tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl)
     }
-  }, [searchParams])
+  }, [searchParams, activeTab])
 
   const handleSearch = async (query: string, newSearchType: "domain" | "keyword", newKeywordMode?: "domain-only" | "full-url") => {
     if (!query || !query.trim()) return
@@ -107,11 +107,7 @@ function DomainContent({
   const [summary, setSummary] = useState<SummaryStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    loadSummary()
-  }, [domain, searchType, keywordMode])
-
-  const loadSummary = async () => {
+  const loadSummary = useCallback(async () => {
     setIsLoading(true)
     try {
       const body: any = { targetDomain: domain, searchType }
@@ -135,7 +131,11 @@ function DomainContent({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [domain, searchType, keywordMode])
+
+  useEffect(() => {
+    loadSummary()
+  }, [loadSummary])
 
   return (
     <div className="space-y-4">
@@ -191,4 +191,3 @@ function DomainContent({
     </div>
   )
 }
-
