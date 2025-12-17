@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Server, User, Package, FileText, LayoutDashboard } from "lucide-react"
+import { ArrowLeft, Server, User, Package, FileText, LayoutDashboard, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +11,7 @@ import { DeviceSoftwareTable } from "@/components/device/DeviceSoftwareTable"
 import { DeviceFileTreeViewer } from "@/components/device/DeviceFileTreeViewer"
 import { DeviceMachineInfo } from "@/components/device/DeviceMachineInfo"
 import { DeviceOverview } from "@/components/device/DeviceOverview"
+import { LinkGraph } from "@/components/device/link-graph"
 import { FileContentDialog } from "@/components/file/FileContentDialog"
 
 interface DeviceInfo {
@@ -219,7 +220,7 @@ export default function DeviceDetailPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-4">
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-5 glass-card h-8">
+          <TabsList className="items-center justify-center rounded-md p-1 text-muted-foreground grid w-full grid-cols-6 glass-card h-8">
             <TabsTrigger
               value="overview"
               className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
@@ -255,6 +256,13 @@ export default function DeviceDetailPage() {
               <FileText className="h-3 w-3 mr-1" />
               Files
             </TabsTrigger>
+            <TabsTrigger
+              value="graph"
+              className="text-xs font-normal data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-2 py-1 hover:bg-white/5 hover:text-foreground transition-colors"
+            >
+              <Share2 className="h-3 w-3 mr-1" />
+              Link Graph
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-4">
@@ -279,6 +287,10 @@ export default function DeviceDetailPage() {
               onFileClick={handleFileClick}
               onDownloadAllData={handleDownloadAllData}
             />
+          </TabsContent>
+
+          <TabsContent value="graph" className="mt-4">
+            <LinkGraph deviceId={deviceId} />
           </TabsContent>
         </Tabs>
       </div>
