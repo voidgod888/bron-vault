@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   AreaChart,
   Area,
@@ -23,8 +23,8 @@ interface TimelineChartProps {
 export function TimelineChart({ data: initialData, targetDomain, onGranularityChange }: TimelineChartProps) {
   const [granularity, setGranularity] = useState<"auto" | "weekly" | "monthly">("auto")
   
-  // Use initialData directly, no need for internal state that causes delay
-  const data = Array.isArray(initialData) ? initialData : []
+  // Memoize data to prevent re-renders if the array content is the same but reference changes
+  const data = useMemo(() => Array.isArray(initialData) ? initialData : [], [initialData])
 
   useEffect(() => {
     console.log("📊 TimelineChart received data:", {
@@ -107,4 +107,3 @@ export function TimelineChart({ data: initialData, targetDomain, onGranularityCh
     </div>
   )
 }
-
