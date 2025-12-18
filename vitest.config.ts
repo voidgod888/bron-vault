@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['scripts/**/*.test.ts', 'scanner/**/*.test.ts', 'app/**/*.test.ts'],
+    include: ['scripts/**/*.test.ts', 'scanner/**/*.test.ts', 'app/**/*.test.ts', 'components/**/*.test.ts', 'components/**/*.test.tsx'],
   },
 })

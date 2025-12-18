@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef } from "react"
+import React, { useEffect, useRef, useMemo } from "react"
 import { Copy, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { SearchResult, groupResultsByName } from "./search-utils"
@@ -60,13 +60,15 @@ export function SearchResults({
     }
   }, [hasMore, isLoading, onLoadMore])
 
+  // Memoize grouped results to prevent recalculation on every render
+  // This is especially important when other props like isLoading change
+  const groupedResults = useMemo(() => groupResultsByName(searchResults), [searchResults])
+  const displayCount = totalDevices > 0 ? totalDevices : searchResults.length
+
   // Don't render anything if no results and not loading and no search query
   if (searchResults.length === 0 && !isLoading && !searchQuery) {
     return null
   }
-
-  const groupedResults = groupResultsByName(searchResults)
-  const displayCount = totalDevices > 0 ? totalDevices : searchResults.length
 
   return (
     <div className="space-y-4">
