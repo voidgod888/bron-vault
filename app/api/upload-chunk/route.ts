@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { validateRequest } from "@/lib/auth"
 import { chunkManager } from "@/lib/upload/chunk-manager"
 import { createWriteStream } from "fs"
-import { existsSync } from "fs"
-import { mkdir } from "fs/promises"
+import { ensureDirectory } from "@/lib/upload/fs-utils"
 import path from "path"
 import { pipeline } from "stream/promises"
 
@@ -51,10 +50,8 @@ export async function POST(request: NextRequest) {
     const chunkPath = chunkManager.getChunkPath(fileId, chunkIndex)
     const chunkDir = path.dirname(chunkPath)
 
-    // Create chunk directory if it doesn't exist
-    if (!existsSync(chunkDir)) {
-      await mkdir(chunkDir, { recursive: true })
-    }
+    // Create chunk directory if it doesn't exist and ensure it's writable
+    await ensureDirectory(chunkDir)
 
     // Convert File to Buffer and write to disk
     // Note: For very large chunks, we could stream, but File API in Next.js

@@ -3,10 +3,9 @@ import { validateRequest } from "@/lib/auth"
 import { chunkManager } from "@/lib/upload/chunk-manager"
 import { createReadStream, createWriteStream } from "fs"
 import { unlink } from "fs/promises"
-import { existsSync } from "fs"
 import path from "path"
 import { pipeline } from "stream/promises"
-import { mkdir } from "fs/promises"
+import { ensureDirectory } from "@/lib/upload/fs-utils"
 import { processFileUploadFromPath } from "@/lib/upload/file-upload-processor"
 import { broadcastLogToSession, closeLogSession } from "@/lib/upload-connections"
 
@@ -103,9 +102,7 @@ export async function POST(request: NextRequest) {
 
     // Create uploads directory if it doesn't exist
     const uploadsDir = path.join(process.cwd(), "uploads")
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
+    await ensureDirectory(uploadsDir)
 
     // Assemble file path
     const assembledFilePath = path.join(uploadsDir, fileName)
