@@ -65,8 +65,13 @@ export async function POST(request: NextRequest) {
       await client.connect()
 
       try {
+        // Dynamically import to avoid build errors if the path is slightly different in different versions
+        // or just use the client.signIn method which is higher level.
+        // However, keeping the invoke structure but fixing the import.
+        // In gramjs, usually it is `Api.auth.SignIn`.
+        const { Api } = require("telegram");
         await client.invoke(
-            new (require("telegram/tl/functions/auth").auth.SignIn)({
+            new Api.auth.SignIn({
                 phoneNumber: config.phone,
                 phoneCodeHash: storedHash,
                 phoneCode: code,

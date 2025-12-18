@@ -27,7 +27,7 @@ async function downloadMedia(client: TelegramClient, message: any, downloadDir: 
 
       const buffer = await client.downloadMedia(message, {
           workers: 1,
-      })
+      } as any)
 
       if (!buffer) return null
 
@@ -106,8 +106,9 @@ async function main() {
 
         for (const message of messages) {
             // Check if message has file
-            if (message.media && message.media.document) {
-                const mimeType = message.media.document.mimeType
+            const media = message.media as any;
+            if (media && media.document) {
+                const mimeType = media.document.mimeType
                 const isZip = mimeType === "application/zip" || mimeType === "application/x-zip-compressed"
                 const isTxt = mimeType === "text/plain"
 

@@ -1,7 +1,11 @@
 .env
 .env.local
-node_modules/*
-.next/*
-uploads/*
+node_modules/
+scanner/node_modules/
+.next/
+uploads/
 clickhouse-data
 mysql-data
+mysql-data/*
+*.log
+downloads_temp/
