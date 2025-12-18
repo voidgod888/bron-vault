@@ -16,6 +16,7 @@ import { FileContentDialog } from "@/components/file/FileContentDialog"
 // Import custom hooks
 import { useStats } from "@/hooks/useStats"
 import { useSearch } from "@/hooks/useSearch"
+import { SearchResult } from "@/components/search/search-utils"
 
 // Type definitions
 interface StoredFile {
@@ -38,24 +39,6 @@ interface TreeNode {
   hasContent?: boolean
   size?: number
   level?: number
-}
-
-interface SearchResult {
-  deviceId: string
-  deviceName: string
-  uploadBatch: string
-  matchingFiles: string[]
-  matchedContent: string[]
-  files: StoredFile[]
-  totalFiles: number
-  upload_date?: string
-  uploadDate?: string
-  operatingSystem?: string
-  ipAddress?: string
-  username?: string
-  hostname?: string
-  country?: string
-  filePath?: string
 }
 
 interface Credential {
@@ -102,6 +85,12 @@ export default function SearchPage() {
   const [softwareSearchQuery, setSoftwareSearchQuery] = useState("")
   const [selectedFileType, setSelectedFileType] = useState<'text' | 'image' | null>(null)
   const [searchActive, setSearchActive] = useState(false)
+
+  // Handle device selection
+  const handleDeviceSelect = useCallback((device: SearchResult) => {
+    console.log("🖱️ Device card clicked:", device.deviceId, device.deviceName)
+    setSelectedDevice(device)
+  }, [])
 
 
   // Load device info function (OS, IP Address, Username, Hostname, Country, Path)
@@ -592,10 +581,7 @@ export default function SearchPage() {
               hasMore={pagination?.hasMore || false}
               totalDevices={totalDevices}
               onLoadMore={loadMore}
-              onDeviceSelect={(device) => {
-                console.log("🖱️ Device card clicked:", device.deviceId, device.deviceName)
-                setSelectedDevice(device)
-              }}
+              onDeviceSelect={handleDeviceSelect}
             />
 
             {/* No results message - only show if search has been executed */}
