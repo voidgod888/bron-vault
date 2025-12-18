@@ -84,6 +84,9 @@ export async function POST(request: NextRequest) {
            if (e.message.includes("PHONE_CODE_INVALID")) {
                return NextResponse.json({ error: "Invalid Code" }, { status: 400 })
           }
+           if (e.message.includes("PHONE_CODE_EXPIRED")) {
+               return NextResponse.json({ error: "Code expired. Please request a new code." }, { status: 400 })
+          }
           throw e
       }
 
