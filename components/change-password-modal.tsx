@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useFocusTrap, announceToScreenReader } from "@/lib/accessibility";
@@ -127,9 +128,8 @@ export default function ChangePasswordModal({ open, onOpenChange }: ChangePasswo
               <Label htmlFor="current-password" className="text-foreground">
                 Current Password
               </Label>
-              <Input
+              <PasswordInput
                 id="current-password"
-                type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="glass-input"
@@ -140,9 +140,8 @@ export default function ChangePasswordModal({ open, onOpenChange }: ChangePasswo
               <Label htmlFor="new-password" className="text-foreground">
                 New Password
               </Label>
-              <Input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="glass-input"
@@ -153,9 +152,8 @@ export default function ChangePasswordModal({ open, onOpenChange }: ChangePasswo
               <Label htmlFor="confirm-password" className="text-foreground">
                 Confirm New Password
               </Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="glass-input"
