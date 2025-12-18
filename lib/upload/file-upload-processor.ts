@@ -1,5 +1,5 @@
-import { writeFile, mkdir, unlink } from "fs/promises"
-import { existsSync } from "fs"
+import { writeFile, unlink } from "fs/promises"
+import { ensureDirectory } from "@/lib/upload/fs-utils"
 import path from "path"
 import { initializeDatabase } from "@/lib/mysql"
 // Import versi streaming (untuk file besar)
@@ -35,11 +35,9 @@ export async function processFileUpload(
 
     logWithBroadcast("📦 File received: " + file.name + " Size: " + file.size, "info")
 
-    // Create uploads directory if it doesn't exist
+    // Create uploads directory if it doesn't exist and ensure it's writable
     const uploadsDir = path.join(process.cwd(), "uploads")
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
+    await ensureDirectory(uploadsDir)
 
     // Save uploaded file temporarily
     const bytes = await file.arrayBuffer()
