@@ -317,6 +317,53 @@ async function createTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
+  // Create sources table
+  await executeQuery(`
+    CREATE TABLE IF NOT EXISTS sources (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      identifier VARCHAR(255) NOT NULL, -- Channel ID or Username
+      type VARCHAR(50) DEFAULT 'telegram',
+      enabled BOOLEAN DEFAULT TRUE,
+      last_scraped_at TIMESTAMP NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY idx_identifier_type (identifier, type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
+
+  // Ensure devices table has source_id column
+  try {
+    const columnCheck = await executeQuery(
+      `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'devices' AND COLUMN_NAME = 'source_id'
+    `,
+      [dbConfig.database],
+    )
+
+    if ((columnCheck as any[]).length === 0) {
+      console.log("➕ Adding source_id column to devices table...")
+      await executeQuery(`
+        ALTER TABLE devices ADD COLUMN source_id INT NULL
+      `)
+
+      await executeQuery(`
+        ALTER TABLE devices ADD CONSTRAINT fk_devices_source
+        FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE SET NULL
+      `)
+
+      await executeQuery(`
+        CREATE INDEX idx_devices_source_id ON devices(source_id)
+      `)
+
+      console.log("✅ source_id column added successfully")
+    }
+  } catch (error) {
+    console.log('⚠️ Error checking/adding source_id column:', error);
+  }
+
   // Create app_settings table
   await createAppSettingsTable()
 }
