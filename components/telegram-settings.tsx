@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -170,11 +171,10 @@ export function TelegramSettings() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="apiHash">API Hash</Label>
-              <Input
+              <PasswordInput
                 id="apiHash"
                 value={apiHash}
                 onChange={(e) => setApiHash(e.target.value)}
-                type="password"
               />
             </div>
             <div className="grid gap-2">
