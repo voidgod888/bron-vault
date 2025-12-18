@@ -17,6 +17,21 @@ Our goal is to support the day-to-day needs of security teams on the front lines
 ## Key Features
 
   * **File Upload & Processing**: Upload `.zip` files containing common stealer log formats with real-time upload progress tracking and detailed logging.
+
+  * **Telegram Scraper**: Automatically scrape and ingest stealer logs from monitored Telegram channels.
+    - Connect your Telegram account via the dashboard.
+    - Configure specific channels to monitor.
+    - Automatically downloads and parses `.zip` and `.txt` files from channels.
+    - [See Setup Guide](docs/TELEGRAM_SCRAPER.md)
+
+  * **Background Asset Scanner**: Active reconnaissance on discovered domains.
+    - Automatically scans domains found in logs for open ports (HTTP, HTTPS, SSH, FTP, etc.).
+    - Captures web titles, server headers, and SSL certificate details.
+    - Runs quietly in the background using a dedicated worker and Redis queue.
+
+  * **Advanced Visualizations**:
+    - **Geospatial Analysis**: Interactive world map visualizing the physical location of infected devices.
+    - **Link Analysis**: Force-directed graph visualizations to explore relationships between devices, domains, and files.
     
   * **Advanced Search**: Instantly find credentials and pivot to the full context of the breach.
     - Search by specific email addresses or entire domains across all logs.
@@ -86,11 +101,17 @@ Our goal is to support the day-to-day needs of security teams on the front lines
 
 ### Architecture & Performance
 
-Broń Vault now features **ClickHouse integration** to dramatically accelerate analytics queries and domain searches. With ClickHouse's columnar storage and MaterializedMySQL replication, complex queries that previously took seconds now complete much faster, enabling real-time exploration of large datasets.
+Broń Vault utilizes a modern, containerized architecture:
 
-**Automatic Data Synchronization:** ClickHouse automatically replicates data from MySQL through MaterializedMySQL. Once configured, every change in MySQL is synced to ClickHouse in real-time (no manual steps required). You can focus on analytics while the system handles all synchronization behind the scenes.
+1.  **Next.js App**: The main web interface and API.
+2.  **MySQL 8.0**: Primary transactional database.
+3.  **ClickHouse**: Analytical database for high-performance querying, synchronized via MaterializedMySQL.
+4.  **Redis**: High-performance job queue for background tasks.
+5.  **Scanner Worker**: Dedicated service for active asset scanning (ports, SSL, etc.).
 
-> 💡 **And don't worry about the complexity!** We've created a complete Docker service setup that handles all the configuration automatically. Just run a single script, and everything -> MySQL, ClickHouse, MaterializedMySQL replication, and the Next.js application, will be set up and ready to use.
+**Automatic Data Synchronization:** ClickHouse automatically replicates data from MySQL through MaterializedMySQL. Once configured, every change in MySQL is synced to ClickHouse in real-time.
+
+> 💡 **Simple Setup!** We've created a complete Docker service setup that handles all the configuration automatically. Just run a single script, and everything -> MySQL, ClickHouse, Redis, Scanner, and the Next.js application, will be set up and ready to use.
 
 Follow these steps to get Broń Vault up and running locally.
 
@@ -141,7 +162,7 @@ This application has been successfully tested on the following operating systems
 
     As a note, this script will:
     - Build Docker images (only on the first run)
-    - Start MySQL, ClickHouse, and the Next.js application
+    - Start MySQL, ClickHouse, Redis, Scanner Worker, and the Next.js application
     - Run the setup script to configure MaterializedMySQL replication
     - Display service status and access URLs
 
@@ -176,6 +197,7 @@ Once all services are running, you can access:
 ```bash
 # Linux/macOS
 ./docker-status.sh
+```
 
 **View logs:**
 ```bash
@@ -190,6 +212,11 @@ docker-compose down
 **Restart services:**
 ```bash
 docker-compose restart
+```
+
+**Run Telegram Scraper:**
+```bash
+docker exec -it bronvault_app npm run scraper:telegram
 ```
 
 ### Initial Setup
