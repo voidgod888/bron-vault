@@ -1,42 +1,10 @@
 "use client"
 
 import React from "react"
-import { Download, Eye, Image, Book, Package, Folder, FileText } from "lucide-react"
+import { Download, Eye, Image as ImageIcon, Book, Package, Folder, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
-interface StoredFile {
-  file_path: string
-  file_name: string
-  parent_path: string
-  is_directory: boolean
-  file_size?: number
-  has_content: boolean
-}
-
-interface SearchResult {
-  deviceId: string
-  deviceName: string
-  uploadBatch: string
-  matchingFiles: string[]
-  matchedContent: string[]
-  files: StoredFile[]
-  totalFiles: number
-  upload_date?: string
-  uploadDate?: string
-}
-
-// ASCII Tree Node Interface - IntelX Style
-interface TreeNode {
-  name: string
-  path: string
-  isDirectory: boolean
-  hasMatch: boolean
-  hasContent: boolean
-  size?: number
-  children: TreeNode[]
-  level: number
-}
+import { SearchResult, StoredFile, TreeNode } from "@/lib/types"
 
 interface FileTreeViewerProps {
   selectedDevice: SearchResult
@@ -180,7 +148,7 @@ export function FileTreeViewer({ selectedDevice, onFileClick, onDownloadAllData 
           actionText = "Click to view content"
           isClickable = true
         } else if (["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(fileExtension) && node.hasContent) {
-          icon = <Image className="inline h-4 w-4 text-violet-500" />
+          icon = <ImageIcon className="inline h-4 w-4 text-violet-500" />
           actionIcon = <Eye className="inline h-4 w-4 text-blue-500 ml-1" />
           actionText = "Click to preview image"
           isClickable = true
@@ -266,7 +234,7 @@ export function FileTreeViewer({ selectedDevice, onFileClick, onDownloadAllData 
       <div className="mt-3 mb-2 text-xs text-muted-foreground">
         <div className="flex items-center space-x-4">
           <span className="flex items-center"><Eye className="inline h-4 w-4 text-blue-500 mr-1" /> = Viewable text file</span>
-          <span className="flex items-center"><Image className="inline h-4 w-4 text-violet-500 mr-1" /> = Image</span>
+          <span className="flex items-center"><ImageIcon className="inline h-4 w-4 text-violet-500 mr-1" /> = Image</span>
           <span className="flex items-center"><Book className="inline h-4 w-4 text-primary mr-1" /> = PDF</span>
           <span className="flex items-center"><Book className="inline h-4 w-4 text-blue-500 mr-1" /> = Document</span>
           <span className="flex items-center"><Book className="inline h-4 w-4 text-emerald-500 mr-1" /> = Spreadsheet</span>

@@ -1,13 +1,12 @@
 "use client"
 
-import { Search, Upload, BarChart3, Bug, Globe, Settings } from "lucide-react"
-import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Sun, Moon } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import React from "react"
 import Image from "next/image"
+import Link from "next/link"
 
 import {
   Sidebar,
@@ -21,72 +20,7 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar"
 
-
-
-const menuGroups = [
-  {
-    title: "Home",
-    items: [
-      {
-        title: "Dashboard",
-        description: "Overview & Statistics",
-        url: "/dashboard",
-        icon: BarChart3,
-      },
-    ],
-  },
-  {
-    title: "Discovery",
-    items: [
-      {
-        title: "Search",
-        description: "Search & Analyze Data",
-        url: "/",
-        icon: Search,
-      },
-      {
-        title: "Asset Discovery",
-        description: "Explore Footprint",
-        url: "/domain-search",
-        icon: Globe,
-      },
-    ],
-  },
-  {
-    title: "Import",
-    items: [
-      {
-        title: "Upload",
-        description: "Upload & Process Files",
-        url: "/upload",
-        icon: Upload,
-      },
-      {
-        title: "Sources",
-        description: "Manage Data Sources",
-        url: "/dashboard/sources",
-        icon: Globe,
-      },
-      {
-        title: "Debug ZIP",
-        description: "Validate ZIP Files",
-        url: "/debug-zip",
-        icon: Bug,
-      },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      {
-        title: "Settings",
-        description: "Configure System",
-        url: "/settings",
-        icon: Settings,
-      },
-    ],
-  },
-]
+import { menuGroups } from "@/lib/menu-config"
 
 export function AppSidebar() {
   const pathname = usePathname();

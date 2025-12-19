@@ -1,8 +1,9 @@
 "use client";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import AppHeader from "@/components/app-header";
+import { getPageTitle } from "@/lib/menu-config";
 
 export default function ClientLayoutWithSidebar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,11 +14,7 @@ export default function ClientLayoutWithSidebar({ children }: { children: React.
   }, [pathname]);
 
   // Determine page title based on pathname
-  let title = "broń Vault";
-  if (pathname === "/dashboard") title = "broń Vault - Dashboard";
-  else if (pathname === "/") title = "broń Vault - Search";
-  else if (pathname === "/upload") title = "broń Vault - Upload";
-  else if (pathname === "/debug-zip") title = "broń Vault - Debug ZIP";
+  const title = getPageTitle(pathname);
 
   // Don't render sidebar/header if on login page
   if (pathname === "/login") {
@@ -35,4 +32,4 @@ export default function ClientLayoutWithSidebar({ children }: { children: React.
       </div>
     </>
   );
-} 
+}
