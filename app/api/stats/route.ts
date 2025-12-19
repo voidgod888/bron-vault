@@ -64,12 +64,12 @@ export async function GET(request: NextRequest) {
     console.log("📊 Calculating fresh stats...")
 
     // Run all queries in parallel for maximum speed
-    let deviceStatsResult: any[]
-    let fileCountResult: any[]
-    let aggregatedStatsResult: any[]
-    let topPasswordsResult: any[]
-    let recentDevicesResult: any[]
-    let batchStatsResult: any[]
+    let deviceStatsResult: any
+    let fileCountResult: any
+    let aggregatedStatsResult: any
+    let topPasswordsResult: any
+    let recentDevicesResult: any
+    let batchStatsResult: any
 
     try {
       [

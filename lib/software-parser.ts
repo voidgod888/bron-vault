@@ -1,4 +1,4 @@
-import { pool } from "./mysql";
+import { pool } from "./db";
 
 interface SoftwareData {
   software_name: string;
@@ -67,6 +67,7 @@ export async function parseSoftwareFile(
             source_file = VALUES(source_file)
           `;
 
+          // Using pool.query directly to support nested array syntax for bulk insert
           await pool.query(query, [values]);
           console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1} (${batch.length} entries) from ${sourceFile} for device ${deviceId}`);
         } catch (insertError) {

@@ -51,22 +51,6 @@ export function useFocusTrap(isActive: boolean) {
   return elementRef
 }
 
-// Hook for restoring focus
-export function useFocusRestore() {
-  const previousActiveElement = useRef<HTMLElement | null>(null)
-
-  const saveFocus = () => {
-    previousActiveElement.current = document.activeElement as HTMLElement
-  }
-
-  const restoreFocus = () => {
-    if (previousActiveElement.current) {
-      previousActiveElement.current.focus()
-    }
-  }
-
-  return { saveFocus, restoreFocus }
-}
 
 // Keyboard navigation utilities
 export const KEYBOARD_KEYS = {

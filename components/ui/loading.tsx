@@ -112,45 +112,6 @@ export function LoadingCard({ title, description, className }: LoadingCardProps)
   )
 }
 
-interface LoadingTableProps {
-  rows?: number
-  columns?: number
-  className?: string
-}
-
-export function LoadingTable({ rows = 5, columns = 4, className }: LoadingTableProps) {
-  return (
-    <div className={cn("space-y-3", className)}>
-      {/* Header */}
-      <div className="grid gap-4 animate-pulse" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
-        {Array.from({ length: columns }).map((_, i) => (
-          <div key={i} className="h-4 bg-card/40 rounded"></div>
-        ))}
-      </div>
-      
-      {/* Rows */}
-      {Array.from({ length: rows }).map((_, rowIndex) => (
-        <div 
-          key={rowIndex} 
-          className="grid gap-4 animate-pulse" 
-          style={{ 
-            gridTemplateColumns: `repeat(${columns}, 1fr)`,
-            animationDelay: `${rowIndex * 100}ms`
-          }}
-        >
-          {Array.from({ length: columns }).map((_, colIndex) => (
-            <div 
-              key={colIndex} 
-              className="h-3 bg-card/40 rounded"
-              style={{ width: `${Math.random() * 40 + 60}%` }}
-            ></div>
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 interface LoadingChartProps {
   height?: number
   className?: string
@@ -191,36 +152,3 @@ export function LoadingChart({ height = 300, className }: LoadingChartProps) {
   )
 }
 
-interface LoadingButtonProps {
-  children: React.ReactNode
-  loading?: boolean
-  disabled?: boolean
-  className?: string
-  onClick?: () => void
-}
-
-export function LoadingButton({ 
-  children, 
-  loading = false, 
-  disabled = false, 
-  className,
-  onClick 
-}: LoadingButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled || loading}
-      className={cn(
-        "inline-flex items-center justify-center px-4 py-2 rounded-md",
-        "bg-primary text-primary-foreground font-medium",
-        "hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary",
-        "disabled:opacity-50 disabled:cursor-not-allowed",
-        "transition-colors duration-200",
-        className
-      )}
-    >
-      {loading && <LoadingSpinner size="sm" className="mr-2" />}
-      {children}
-    </button>
-  )
-}
