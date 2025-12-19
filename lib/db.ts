@@ -99,10 +99,11 @@ async function ensureLocalFilePathColumn() {
 
 async function createTables() {
   // Create devices table
+  // Optimized for SingleStore with SHARD KEY and SORT KEY
   await executeQuery(`
     CREATE TABLE IF NOT EXISTS devices (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      device_id VARCHAR(255) UNIQUE NOT NULL,
+      device_id VARCHAR(255) NOT NULL,
       device_name VARCHAR(500) NOT NULL,
       device_name_hash VARCHAR(64) NOT NULL,
       upload_batch VARCHAR(255) NOT NULL,
@@ -112,15 +113,17 @@ async function createTables() {
       total_domains INT DEFAULT 0,
       total_urls INT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      source_id INT NULL,
+      SHARD KEY (device_id),
+      SORT KEY (upload_date, device_id),
+      UNIQUE KEY unique_device_id (device_id),
       INDEX idx_device_name (device_name),
-      INDEX idx_device_name_hash (device_name_hash),
       INDEX idx_upload_batch (upload_batch),
-      INDEX idx_upload_date (upload_date)
+      INDEX idx_devices_source_id (source_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
   // Create files table
-  // Updated: Removed FULLTEXT index (not used), added file_type column, added local_file_path support
   await executeQuery(`
     CREATE TABLE IF NOT EXISTS files (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -134,13 +137,11 @@ async function createTables() {
       local_file_path TEXT NULL,
       file_type ENUM('text', 'binary', 'unknown') DEFAULT 'unknown',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE,
-      INDEX idx_device_id (device_id),
-      INDEX idx_file_name (file_name),
+      SHARD KEY (device_id),
+      SORT KEY (device_id, is_directory, file_name),
       INDEX idx_created_at (created_at),
       INDEX idx_local_file_path (local_file_path(255))
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    COMMENT = 'Files table: metadata only. All file contents stored on disk via local_file_path'
   `)
 
   // Create credentials table
@@ -156,12 +157,13 @@ async function createTables() {
       browser VARCHAR(255),
       file_path TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE,
-      INDEX idx_device_id (device_id),
-      INDEX idx_domain (domain),
+      SHARD KEY (device_id),
+      SORT KEY (domain, device_id),
       INDEX idx_tld (tld),
       INDEX idx_username (username),
-      INDEX idx_created_at (created_at)
+      INDEX idx_created_at (created_at),
+      INDEX idx_browser_device (browser, device_id),
+      INDEX idx_domain_url (domain, url(255))
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
@@ -173,8 +175,8 @@ async function createTables() {
       password TEXT NOT NULL,
       count INT DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE,
-      INDEX idx_device_id (device_id),
+      SHARD KEY (device_id),
+      SORT KEY (password),
       INDEX idx_count (count)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
@@ -187,7 +189,7 @@ async function createTables() {
       cache_data LONGTEXT,
       expires_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_cache_key (cache_key),
+      SHARD KEY (cache_key),
       INDEX idx_expires_at (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
@@ -201,12 +203,10 @@ async function createTables() {
       version VARCHAR(500) NULL,
       source_file VARCHAR(255) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE,
-      INDEX idx_device_id (device_id),
-      INDEX idx_software_name (software_name),
+      SHARD KEY (device_id),
+      SORT KEY (software_name, device_id),
       INDEX idx_version (version),
-      INDEX idx_source_file (source_file),
-      INDEX idx_created_at (created_at)
+      INDEX idx_source_file (source_file)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
@@ -222,7 +222,7 @@ async function createTables() {
   await executeQuery(`
     CREATE TABLE IF NOT EXISTS systeminformation (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      device_id VARCHAR(255) NOT NULL UNIQUE,
+      device_id VARCHAR(255) NOT NULL,
       stealer_type VARCHAR(100) NOT NULL DEFAULT 'Generic',
       os VARCHAR(500) NULL,
       ip_address VARCHAR(100) NULL,
@@ -240,16 +240,14 @@ async function createTables() {
       source_file VARCHAR(255) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE,
-      INDEX idx_device_id (device_id),
+      SHARD KEY (device_id),
+      SORT KEY (log_date, device_id),
+      UNIQUE KEY unique_device_id (device_id),
       INDEX idx_stealer_type (stealer_type),
       INDEX idx_os (os(255)),
       INDEX idx_ip_address (ip_address),
-      INDEX idx_username (username(255)),
       INDEX idx_country (country),
-      INDEX idx_hwid (hwid),
-      INDEX idx_source_file (source_file),
-      INDEX idx_created_at (created_at)
+      INDEX idx_hwid (hwid)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
   
@@ -301,7 +299,8 @@ async function createTables() {
       name VARCHAR(255) NOT NULL,
       query TEXT NOT NULL,
       search_type VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      SHARD KEY (id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
@@ -313,7 +312,8 @@ async function createTables() {
       pattern TEXT NOT NULL,
       severity ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
       description TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      SHARD KEY (id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
@@ -328,44 +328,87 @@ async function createTables() {
       last_scraped_at TIMESTAMP NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      SHARD KEY (id),
       UNIQUE KEY idx_identifier_type (identifier, type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `)
 
-  // Ensure devices table has source_id column
-  try {
-    const columnCheck = await executeQuery(
-      `
-      SELECT COLUMN_NAME
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'devices' AND COLUMN_NAME = 'source_id'
-    `,
-      [dbConfig.database],
-    )
+  // Create scanned_hosts table
+  await executeQuery(`
+    CREATE TABLE IF NOT EXISTS scanned_hosts (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      domain VARCHAR(255) NOT NULL,
+      ip_address VARCHAR(100),
+      ports JSON,
+      http_status INT,
+      http_title TEXT,
+      http_server VARCHAR(255),
+      ssl_issuer VARCHAR(255),
+      ssl_expiry DATETIME,
+      scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      priority ENUM('high', 'low') DEFAULT 'low',
+      scan_status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
+      error_message TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      SHARD KEY (domain),
+      SORT KEY (scan_date),
+      UNIQUE KEY idx_domain (domain),
+      INDEX idx_ip_address (ip_address),
+      INDEX idx_scan_status (scan_status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
 
-    if ((columnCheck as any[]).length === 0) {
-      console.log("➕ Adding source_id column to devices table...")
-      await executeQuery(`
-        ALTER TABLE devices ADD COLUMN source_id INT NULL
-      `)
+  // Create users table
+  await executeQuery(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      name VARCHAR(255) DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      SHARD KEY (id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
 
-      await executeQuery(`
-        ALTER TABLE devices ADD CONSTRAINT fk_devices_source
-        FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE SET NULL
-      `)
+  // Create upload_errors table
+  await executeQuery(`
+    CREATE TABLE IF NOT EXISTS upload_errors (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      file_path TEXT NOT NULL,
+      error_message TEXT,
+      stage VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      SHARD KEY (id),
+      INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
 
-      await executeQuery(`
-        CREATE INDEX idx_devices_source_id ON devices(source_id)
-      `)
-
-      console.log("✅ source_id column added successfully")
-    }
-  } catch (error) {
-    console.log('⚠️ Error checking/adding source_id column:', error);
-  }
+  // Create audit_logs table
+  await executeQuery(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_email VARCHAR(255) NOT NULL,
+      action VARCHAR(255) NOT NULL,
+      details JSON,
+      ip_address VARCHAR(45),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      SHARD KEY (id),
+      SORT KEY (created_at),
+      INDEX idx_user_email (user_email),
+      INDEX idx_action (action)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
 
   // Create app_settings table
   await createAppSettingsTable()
+
+  // Insert default admin user if not exists
+  await executeQuery(`
+    INSERT IGNORE INTO users (email, password_hash, name)
+    VALUES ('admin@bronvault.local', '$2b$12$V3YGoZlvgABmhIbt7H0ZyeygLONKnSe1TKuvp8OwEvc4u7nFWUUd.', 'Admin')
+  `)
 }
 
 /**
@@ -392,6 +435,7 @@ async function createAppSettingsTable() {
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        SHARD KEY (id),
         INDEX idx_key_name (key_name)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `)
