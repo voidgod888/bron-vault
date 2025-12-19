@@ -10,7 +10,7 @@ services:
   # 1. SINGLESTORE (Replaces MySQL & ClickHouse)
   # -----------------------------------------------------------
   singlestore:
-    image: singlestore/cluster-in-a-box:latest
+    image: ${SINGLESTORE_IMAGE:-singlestore/cluster-in-a-box:latest}
     container_name: bronvault_db
     restart: always
     environment:
@@ -85,6 +85,8 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       DATABASE_URL: "mysql://root:${MYSQL_PASSWORD}@singlestore:3306/${MYSQL_DATABASE}"
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
       # ClickHouse vars REMOVED
       NODE_ENV: production
     volumes:
