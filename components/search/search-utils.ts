@@ -12,6 +12,10 @@ const DATE_MONTH_FIRST = /^(\w+)\s+(\d{1,2}),?\s+(\d{4})/
 const DATE_DAY_FIRST = /^(\d{1,2})\s+(\w+)\s+(\d{4})/
 const TIMEZONE_ABBR_REGEX = /\s+[A-Z]{2,}$/i
 
+import { SearchResult } from "@/lib/types"
+
+export type { SearchResult, StoredFile } from "@/lib/types"
+
 export const formatDate = (dateString: string) => {
   if (!dateString) return "N/A"
   try {
@@ -149,34 +153,6 @@ export const getMatchingFileNames = (matchingFiles: string[]) => {
     const fileName = filePath.split("/").pop() || filePath
     return fileName
   })
-}
-
-export interface StoredFile {
-  file_path: string
-  file_name: string
-  parent_path: string
-  is_directory: boolean
-  file_size?: number
-  has_content: boolean
-}
-
-export interface SearchResult {
-  deviceId: string
-  deviceName: string
-  uploadBatch: string
-  matchingFiles: string[]
-  matchedContent: string[]
-  files: StoredFile[]
-  totalFiles: number
-  upload_date?: string
-  uploadDate?: string
-  logDate?: string
-  operatingSystem?: string
-  ipAddress?: string
-  username?: string
-  hostname?: string
-  country?: string
-  filePath?: string
 }
 
 export const groupResultsByName = (results: SearchResult[]) => {

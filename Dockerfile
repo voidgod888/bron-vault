@@ -1,15 +1,29 @@
 # Install dependencies only when needed
 FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json ./
-RUN yarn install --frozen-lockfile
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
 COPY . .
 COPY --from=deps /app/node_modules ./node_modules
-RUN yarn build
+
+# Build the application
+RUN pnpm build
 
 # Production image, copy all the files and run next
 FROM node:20-alpine AS runner
@@ -40,4 +54,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/auth/check-users', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-CMD ["yarn", "start"] 
+CMD ["npm", "start"]

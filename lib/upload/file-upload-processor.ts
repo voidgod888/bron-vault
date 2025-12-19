@@ -123,13 +123,13 @@ export async function processFileUploadFromPath(
     // Kita langsung panggil processor streaming dengan filePath.
     
     // Threshold untuk menggunakan streaming vs JSZip
-    // File > 500MB akan menggunakan streaming (yauzl)
-    // File <= 500MB akan menggunakan JSZip (backward compatibility)
-    const STREAMING_THRESHOLD_MB = 500
+    // Modified: Set to 0 to use streaming (yauzl) for ALL files to prevent OOM errors
+    // JSZip loads entire file to memory which causes crash on large files
+    const STREAMING_THRESHOLD_MB = 0
     const fileSizeMBNum = parseFloat(fileSizeMB)
     
     let processingResult
-    if (fileSizeMBNum > STREAMING_THRESHOLD_MB) {
+    if (fileSizeMBNum >= STREAMING_THRESHOLD_MB) {
       // Use streaming for large files
       logWithBroadcast(`📦 Processing file: ${fileName} Size: ${fileSizeMB} MB using STREAMING mode (yauzl)`, "info")
       logWithBroadcast("🚀 Starting ZIP stream processing...", "info")

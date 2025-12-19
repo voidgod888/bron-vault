@@ -16,63 +16,45 @@ Our goal is to support the day-to-day needs of security teams on the front lines
 
 ## Key Features
 
-  * **File Upload & Processing**: Upload `.zip` files containing common stealer log formats with real-time upload progress tracking and detailed logging.
+  * **File Upload & Processing**:
+    - Upload `.zip` files containing common stealer log formats.
+    - Real-time upload progress tracking and detailed logging.
+    - Automatic extraction and parsing of credentials, cookies, and system information.
 
-  * **Telegram Scraper**: Automatically scrape and ingest stealer logs from monitored Telegram channels.
-    - Connect your Telegram account via the dashboard.
-    - Configure specific channels to monitor.
-    - Automatically downloads and parses `.zip` and `.txt` files from channels.
+  * **Telegram Scraper**:
+    - Automatically scrape and ingest stealer logs from monitored Telegram channels.
+    - Configure specific channels to monitor via the UI.
+    - Downloads and parses `.zip` and `.txt` files automatically.
     - [See Setup Guide](docs/TELEGRAM_SCRAPER.md)
 
-  * **Background Asset Scanner**: Active reconnaissance on discovered domains.
-    - Automatically scans domains found in logs for open ports (HTTP, HTTPS, SSH, FTP, etc.).
-    - Captures web titles, server headers, and SSL certificate details.
-    - Runs quietly in the background using a dedicated worker and Redis queue.
+  * **Background Asset Scanner**:
+    - Active reconnaissance on discovered domains using a dedicated background worker.
+    - Scans for open ports (HTTP, SSH, FTP, MySQL, etc.) on discovered hosts.
+    - Captures web metadata (titles, server headers) and SSL certificate details.
+    - Powered by Redis for reliable job queuing.
 
   * **Advanced Visualizations**:
     - **Geospatial Analysis**: Interactive world map visualizing the physical location of infected devices.
     - **Link Analysis**: Force-directed graph visualizations to explore relationships between devices, domains, and files.
+    - **Analytics Dashboard**: High-level stats on top passwords, affected browsers, TLDs, and software.
     
-  * **Advanced Search**: Instantly find credentials and pivot to the full context of the breach.
-    - Search by specific email addresses or entire domains across all logs.
-    - A successful match reveals a "Supporting Files" tab with all data from the same device.
-    - Seamlessly explore correlated cookies, browser history, and system files in a single click.
+  * **Advanced Search**:
+    - **Global Search**: Instantly find credentials by email, domain, or keyword across all logs.
+    - **Contextual Pivoting**: A successful match reveals a "Supporting Files" tab with all data from the same device (cookies, history, system files).
+    - **Domain Recon**: Enter a domain to discover all related subdomains, paths, and exposed credentials.
 
-  * **Device Detail View**: Explore individual device information with comprehensive details.
-    - **Overview Tab**: Get an at-a-glance summary with engaging visualizations including:
-      - Summary cards showing total credentials, software, and files
-      - Device overview with key system information (OS, CPU, GPU, RAM, etc.)
-      - Top passwords visualization (polar area chart)
-      - Top domains distribution (horizontal bar chart)
-      - File size distribution analysis
-    - **Host Information Tab**: View detailed system information extracted from logs of multiple stealer families
-    - **User Credentials Tab**: Browse all credentials associated with the device
-    - **Software Installed Tab**: See all installed software detected on the device
-    - **Files Tab**: Explore the complete file structure with tree viewer
+  * **Device Detail View**:
+    - **Overview**: Summary cards, system info (OS, Hardware), and visualization of data types.
+    - **Credentials**: Browse all usernames and passwords associated with the device.
+    - **Files**: Explore the complete file structure with a tree viewer.
+    - **Software**: List of installed applications.
 
-  * **Asset Discovery**: Search for subdomains, paths, and associated credentials for any domain across all uploaded logs.
-    - Enter a `domain` or `keyword` to discover all related subdomains, paths, and exposed credentials.
-    - **Overview Tab**: 
-      - Timeline visualization showing when credentials were logged by stealers (log-date tracking).
-      - Top 10 most-used passwords observed for the queried domain or keyword.
-      - Top 10 subdomains by credential volume with horizontal bar charts.
-      - Top 10 paths by credential volume with horizontal bar charts.
-      - Summary statistics showing total subdomains, paths, credentials, and affected devices.
-    - **Subdomains Tab**: Browse all discovered subdomains with associated paths and credential counts. Includes deduplication feature that aggregates subdomains for clearer insights, automatically summing credential counts when multiple paths exist for the same subdomain.
-    - **Credentials Tab**: View all credentials associated with the domain, including URLs, usernames, passwords, log dates, and direct links to correlated devices.
-
-  * **Statistical Dashboard**: Get a strategic overview of the data through clear visualizations, including:
-      - Total domains and URLs (including IPs)
-      - Total credentials
-      - Total files extracted
-      - Top 5 most common passwords
-      - Top 10 TLDs
-      - Top 10 most affected browsers
-      - Top 10 most used software
-        
-  * **Debug-Zip Utility**: Perform a quick check on `.zip` files to analyze their internal structure, ensure they match supported formats, and flag directories missing a password file.
+  * **Debug Utilities**:
+    - **Debug-Zip**: Analyze the internal structure of `.zip` files to troubleshoot format issues.
+    - **Migration Tools**: Built-in scripts to normalize date formats and fix data inconsistencies.
     
-  * **Simple RSS Feeds**: Integrated RSS feeds from **ransomware.live** and **malware-traffic-analysis.net** to keep you updated on the latest threats.
+  * **Threat Intelligence Feeds**:
+    - Integrated RSS feeds from **ransomware.live** and **malware-traffic-analysis.net**.
   
 ![alt text](images/Bron-Vault-Search-1.png "Bron Vault Search 1")
 
@@ -86,159 +68,135 @@ Our goal is to support the day-to-day needs of security teams on the front lines
 
 ![alt text](images/Bron-Vault-Device-Overview.png "Bron Vault Device Overview")
 
-![alt text](images/Bron-Vault-Domain-Keyword-Search.png "Bron Vault Device Overview")
+![alt text](images/Bron-Vault-Domain-Keyword-Search.png "Bron Vault Domain Search")
 
 -----
 
 ## Important Notice
 
-- This tool was built with a focus on functionality, not hardened security. Do **NOT** deploy this in production environment or expose it to public networks. Use it exclusively in a secure, **isolated** environment.
-- Broń Vault was developed by [Tomi Ashari](https://github.com/mastomii) and [YoKo Kho](https://github.com/yokokho) as a side project under the [ITSEC Asia](https://itsec.asia/) RnD Division, with support from AI-assisted tooling. It does not represent our commercial [IntelliBroń Threat Intelligence](https://intellibron.io/) platform, though it reflects some similar capabilities.
+- This tool was built with a focus on functionality, not hardened security. Do **NOT** deploy this in a production environment or expose it to public networks. Use it exclusively in a secure, **isolated** environment.
+- Broń Vault was developed by [Tomi Ashari](https://github.com/mastomii) and [YoKo Kho](https://github.com/yokokho) as a side project under the [ITSEC Asia](https://itsec.asia/) RnD Division, with support from AI-assisted tooling. It does not represent our commercial [IntelliBroń Threat Intelligence](https://intellibron.io/) platform.
 
 -----
 
 ## Getting Started
 
-### Architecture & Performance
+### Architecture
 
 Broń Vault utilizes a modern, containerized architecture:
 
-1.  **Next.js App**: The main web interface and API.
+1.  **Next.js App**: The main web interface and API (Node.js 20).
 2.  **MySQL 8.0**: Primary transactional database.
 3.  **ClickHouse**: Analytical database for high-performance querying, synchronized via MaterializedMySQL.
-4.  **Redis**: High-performance job queue for background tasks.
+4.  **Redis**: High-performance job queue for the scanner and background tasks.
 5.  **Scanner Worker**: Dedicated service for active asset scanning (ports, SSL, etc.).
-
-**Automatic Data Synchronization:** ClickHouse automatically replicates data from MySQL through MaterializedMySQL. Once configured, every change in MySQL is synced to ClickHouse in real-time.
-
-> 💡 **Simple Setup!** We've created a complete Docker service setup that handles all the configuration automatically. Just run a single script, and everything -> MySQL, ClickHouse, Redis, Scanner, and the Next.js application, will be set up and ready to use.
-
-Follow these steps to get Broń Vault up and running locally.
 
 ### Prerequisites
 
-  * **Docker** and **Docker Compose** installed and running
-    * Docker Desktop: [Download here](https://www.docker.com/products/docker-desktop)
-    * Linux: Install via package manager (e.g., `sudo apt-get install docker.io docker-compose`)
-  * Git (for cloning the repository)
-
-### Tested Environments
-
-This application has been successfully tested on the following operating systems:
-
-  * Ubuntu 24.04 LTS
-  * Kali Linux 2025.3
-  * macOS Sequoia
+  * **Docker** and **Docker Compose**
+    * Windows/Mac: [Docker Desktop](https://www.docker.com/products/docker-desktop)
+    * Linux: `sudo apt-get install docker.io docker-compose`
+  * **Git** (to clone the repository)
 
 ### Installation & Running
 
-#### Quick Start (Recommended)
+#### 1. Quick Start (Recommended)
 
-1.  **Clone this repository:**
+The easiest way to run Broń Vault is using the provided start script.
 
-    ```bash
-    git clone https://github.com/ITSEC-Research/bron-vault
-    cd bron-vault
-    ```
+```bash
+# Clone the repository
+git clone https://github.com/ITSEC-Research/bron-vault
+cd bron-vault
 
-2.  **Configure the Environment:**
+# Configure environment
+cp .env.example .env
+# IMPORTANT: Edit .env and change the default passwords!
 
-    ```bash
-    # Copy the example environment file
-    cp .env.example .env
-    
-    # Edit .env with your secure passwords
-    # IMPORTANT: Change all default passwords for security!
-    ```
+# Start all services
+# On Linux/macOS:
+sudo bash docker-start.sh
+```
 
-3.  **Start all services:**
+The `docker-start.sh` script handles building images, setting up the database replication, and launching the services.
 
-    **For Linux/macOS:**
-    Run the script with elevated privileges:
+#### 2. Access the Application
 
-    ```bash
-    sudo bash docker-start.sh
-    ```
+Once started, access the services at:
 
-    As a note, this script will:
-    - Build Docker images (only on the first run)
-    - Start MySQL, ClickHouse, Redis, Scanner Worker, and the Next.js application
-    - Run the setup script to configure MaterializedMySQL replication
-    - Display service status and access URLs
+- **Web Dashboard:** `http://localhost:3000`
+- **ClickHouse Play:** `http://localhost:8123/play`
+- **MySQL:** `localhost:3306`
 
-4.  **Access the application:**
-
-    Open your browser and navigate to:
-    ```
-    http://localhost:3000
-    ```
-
-#### Default Login Credentials
-
-After the first startup, you can log in with:
-
+**Default Credentials:**
 - **Email:** `admin@bronvault.local`
 - **Password:** `admin`
+> ⚠️ **Change this password immediately after logging in.**
 
-> ⚠️ **Security Note:** Please change the default password immediately after first login!
+### Manual / Development Setup
 
-#### Service URLs
+If you wish to contribute or run the application locally (outside of Docker for the frontend):
 
-Once all services are running, you can access:
+1.  **Install pnpm**: This project uses `pnpm` for package management.
+    ```bash
+    npm install -g pnpm
+    ```
 
-- **Bron Vault App:** http://localhost:3000
-- **ClickHouse Play:** http://localhost:8123/play
-- **MySQL:** localhost:3306
-- **ClickHouse HTTP API:** http://localhost:8123
+2.  **Install Dependencies**:
+    ```bash
+    pnpm install
+    ```
 
-#### Useful Commands
+3.  **Start Infrastructure**:
+    You still need the databases running. You can start just the backing services:
+    ```bash
+    docker-compose up -d mysql clickhouse redis
+    ```
 
-**Check service status:**
-```bash
-# Linux/macOS
-./docker-status.sh
-```
+4.  **Run Development Server**:
+    ```bash
+    pnpm dev
+    ```
 
-**View logs:**
-```bash
-docker-compose logs -f
-```
+-----
 
-**Stop all services:**
-```bash
-docker-compose down
-```
+## Maintenance & Utilities
 
-**Restart services:**
-```bash
-docker-compose restart
-```
+### Running the Telegram Scraper
 
-**Run Telegram Scraper:**
+The Telegram scraper can be run manually via Docker:
+
 ```bash
 docker exec -it bronvault_app npm run scraper:telegram
 ```
 
-### Initial Setup
+For automated scraping, consider adding this command to your system's `crontab`. See [docs/TELEGRAM_SCRAPER.md](docs/TELEGRAM_SCRAPER.md) for full configuration details.
 
-The first time you start the services:
+### Data Migration
 
-1. The setup script will automatically:
-   - Create MySQL replication user for ClickHouse sync
-   - Configure MaterializedMySQL database in ClickHouse
-   - Initialize all database tables and indexes
+If you encounter issues with date formats (e.g., legacy data), we provide a migration script to normalize timestamps:
 
-2. Wait for all services to be ready (usually about 60 seconds)
+```bash
+docker exec -it bronvault_app npm run migrate:dates
+```
 
-3. Access the application at `http://localhost:3000` and log in with the default credentials above
+### Checking Service Status
 
-4. **Important:** Change the default password immediately after first login
+You can check the health of your container stack using the status script:
 
-You are now ready to start using Broń Vault!
-Just upload the stealer logs, and it will automatically parse them.
+```bash
+./docker-status.sh
+```
 
 -----
 
 ## Contributing
 
-If you'd like to improve the project, whether by contributing code or reporting issues and security findings, **your feedback is always welcome**.
+We welcome contributions! Please follow these steps:
+
+1.  Fork the repository.
+2.  Use **pnpm** for dependency management (`pnpm install`).
+3.  Ensure your code passes linting (`pnpm lint`).
+4.  Submit a Pull Request with a clear description of your changes.
+
+If you find a security issue, please report it responsibly to the maintainers.

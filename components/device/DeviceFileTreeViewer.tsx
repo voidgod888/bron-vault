@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { Download, Eye, Image, Book, Package, FileText } from "lucide-react"
+import { Download, Eye, Image as ImageIcon, Book, Package, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -220,7 +220,7 @@ export function DeviceFileTreeViewer({
           actionText = "Click to view content"
           isClickable = true
         } else if (["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(fileExtension) && node.hasContent) {
-          icon = <Image className="inline h-4 w-4 text-violet-500" />
+          icon = <ImageIcon className="inline h-4 w-4 text-violet-500" />
           actionIcon = <Eye className="inline h-4 w-4 text-blue-500 ml-1" />
           actionText = "Click to preview image"
           isClickable = true
@@ -387,7 +387,7 @@ export function DeviceFileTreeViewer({
             <Eye className="inline h-4 w-4 text-blue-500 mr-1" /> = Viewable text file
           </span>
           <span className="flex items-center">
-            <Image className="inline h-4 w-4 text-violet-500 mr-1" /> = Image
+            <ImageIcon className="inline h-4 w-4 text-violet-500 mr-1" /> = Image
           </span>
           <span className="flex items-center">
             <Book className="inline h-4 w-4 text-primary mr-1" /> = PDF

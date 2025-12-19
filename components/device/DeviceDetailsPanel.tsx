@@ -10,40 +10,7 @@ import { CredentialsTable, CredentialsSearchBar } from "./CredentialsTable"
 import { FileTreeViewer } from "../file/FileTreeViewer"
 import { SoftwareTable, SoftwareSearchBar } from "./SoftwareTable"
 import { DeviceSystemInfo } from "./DeviceSystemInfo"
-
-interface SearchResult {
-  deviceId: string
-  deviceName: string
-  uploadBatch: string
-  matchingFiles: string[]
-  matchedContent: string[]
-  files: any[]
-  totalFiles: number
-  upload_date?: string
-  uploadDate?: string
-  // System Information (optional - akan diambil dari database nanti)
-  fileName?: string
-  operatingSystem?: string
-  ipAddress?: string
-  username?: string
-  hostname?: string
-  country?: string
-  filePath?: string
-}
-
-interface Credential {
-  browser: string
-  url: string
-  username: string
-  password: string
-  filePath?: string
-}
-
-interface Software {
-  software_name: string
-  version: string
-  source_file: string
-}
+import { SearchResult, Credential, Software } from "@/lib/types"
 
 interface DeviceDetailsPanelProps {
   selectedDevice: SearchResult | null

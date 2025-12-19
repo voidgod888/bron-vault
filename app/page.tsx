@@ -2,9 +2,9 @@
 export const dynamic = "force-dynamic"
 
 import React, { useState, useEffect, useCallback } from "react"
-import { Database, Folder, FileText, Eye, ImageIcon, Book, Package } from "lucide-react"
+import { Database } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 // Import our new components
 import { SearchInterface } from "@/components/search/SearchInterface"
@@ -13,43 +13,12 @@ import { SearchResults } from "@/components/search/SearchResults"
 import { DeviceDetailsPanel } from "@/components/device/DeviceDetailsPanel"
 import { FileContentDialog } from "@/components/file/FileContentDialog"
 
-// Import custom hooks
+// Import custom hooks and utils
 import { useStats } from "@/hooks/useStats"
 import { useSearch } from "@/hooks/useSearch"
-import { SearchResult } from "@/components/search/search-utils"
-
-// Type definitions
-interface StoredFile {
-  file_path: string
-  file_name: string
-  parent_path: string
-  is_directory: boolean
-  file_size?: number
-  has_content: boolean
-}
-
-interface TreeNode {
-  name: string
-  path: string
-  isDirectory: boolean
-  children: TreeNode[]
-  file?: StoredFile
-  isMatching?: boolean
-  hasMatch?: boolean
-  hasContent?: boolean
-  size?: number
-  level?: number
-}
-
-interface Credential {
-  browser: string
-  url: string
-  username: string
-  password: string
-  filePath?: string
-}
-
-
+import { useDeviceData } from "@/hooks/use-device-data"
+import { downloadDeviceData } from "@/lib/download-utils"
+import { SearchResult } from "@/lib/types"
 
 export default function SearchPage() {
   // Use custom hooks for state management
@@ -74,17 +43,34 @@ export default function SearchPage() {
   const [selectedFile, setSelectedFile] = useState<{ deviceId: string; filePath: string; fileName: string } | null>(null)
   const [fileContent, setFileContent] = useState<string>("")
   const [isLoadingFile, setIsLoadingFile] = useState(false)
-  const [deviceCredentials, setDeviceCredentials] = useState<Credential[]>([])
-  const [isLoadingCredentials, setIsLoadingCredentials] = useState(false)
-  const [credentialsError, setCredentialsError] = useState<string>("")
   const [showPasswords, setShowPasswords] = useState(false)
   const [credentialsSearchQuery, setCredentialsSearchQuery] = useState("")
-  const [deviceSoftware, setDeviceSoftware] = useState<{ software_name: string; version: string; source_file: string }[]>([])
-  const [isLoadingSoftware, setIsLoadingSoftware] = useState(false)
-  const [softwareError, setSoftwareError] = useState<string>("")
   const [softwareSearchQuery, setSoftwareSearchQuery] = useState("")
   const [selectedFileType, setSelectedFileType] = useState<'text' | 'image' | null>(null)
   const [searchActive, setSearchActive] = useState(false)
+
+  // Use new device data hook
+  // We pass a callback to update the selected device state
+  const {
+    deviceCredentials,
+    isLoadingCredentials,
+    credentialsError,
+    loadDeviceCredentials,
+    deviceSoftware,
+    isLoadingSoftware,
+    softwareError,
+    loadDeviceSoftware,
+    loadDeviceInfo,
+    loadDeviceFiles
+  } = useDeviceData(selectedDevice)
+
+  // Wrapper to update selected device with partial updates
+  const updateSelectedDevice = useCallback((updates: Partial<SearchResult>) => {
+    setSelectedDevice((prev) => {
+      if (!prev) return null
+      return { ...prev, ...updates }
+    })
+  }, [])
 
   // Handle device selection
   const handleDeviceSelect = useCallback((device: SearchResult) => {
@@ -92,204 +78,67 @@ export default function SearchPage() {
     setSelectedDevice(device)
   }, [])
 
-
-  // Load device info function (OS, IP Address, Username, Hostname, Country, Path)
-  const loadDeviceInfo = useCallback(async (deviceId: string) => {
-    console.log("🚀 Starting to load device info for device:", deviceId)
-
-    try {
-      console.log("📡 Making API call to /api/device-info")
-      const response = await fetch("/api/device-info", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ deviceId }),
-      })
-
-      console.log("📡 API Response status:", response.status)
-      console.log("📡 API Response ok:", response.ok)
-
-      if (response.ok) {
-        const deviceInfo = await response.json()
-        console.log("✅ API returned device info:", deviceInfo)
-
-        // Update selectedDevice with system information using functional update
-        setSelectedDevice((prevDevice) => {
-          if (prevDevice && prevDevice.deviceId === deviceId) {
-            return {
-              ...prevDevice,
-              operatingSystem: deviceInfo.operatingSystem,
-              ipAddress: deviceInfo.ipAddress,
-              username: deviceInfo.username,
-              hostname: deviceInfo.hostname,
-              country: deviceInfo.country,
-              filePath: deviceInfo.filePath,
-            }
-          }
-          return prevDevice
-        })
-      } else {
-        const errorData = await response.json()
-        console.error("❌ API Error loading device info:", errorData)
-      }
-    } catch (error) {
-      console.error("❌ Failed to load device info:", error)
-    }
-  }, [])
-
-  // Load device credentials function
-  const loadDeviceCredentials = useCallback(async (deviceId: string) => {
-    console.log("🚀 Starting to load credentials for device:", deviceId)
-    setIsLoadingCredentials(true)
-    setCredentialsError("")
-    setDeviceCredentials([]) // Clear previous data
-
-    try {
-      console.log("📡 Making API call to /api/device-credentials")
-      const response = await fetch("/api/device-credentials", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ deviceId }),
-      })
-
-      console.log("📡 API Response status:", response.status)
-      console.log("📡 API Response ok:", response.ok)
-
-      if (response.ok) {
-        const credentials = await response.json()
-        console.log("✅ API returned credentials:", credentials)
-        console.log("📊 Number of credentials received:", credentials.length)
-
-        if (credentials.length > 0) {
-          console.log("📝 Sample credential:", credentials[0])
-        }
-
-        setDeviceCredentials(credentials)
-      } else {
-        const errorData = await response.json()
-        console.error("❌ API Error:", errorData)
-        setCredentialsError(`API Error: ${errorData.error || "Unknown error"}`)
-      }
-    } catch (error) {
-      console.error("❌ Failed to load credentials:", error)
-      setCredentialsError(`Network Error: ${error instanceof Error ? error.message : "Unknown error"}`)
-    } finally {
-      setIsLoadingCredentials(false)
-      console.log("🏁 Finished loading credentials")
-    }
-  }, [])
-
-  // Load device software function
-  const loadDeviceSoftware = useCallback(async (deviceId: string) => {
-    console.log("🚀 Starting to load software for device:", deviceId)
-    setIsLoadingSoftware(true)
-    setSoftwareError("")
-    setDeviceSoftware([]) // Clear previous data
-
-    try {
-      console.log("📡 Making API call to /api/device-software")
-      const response = await fetch("/api/device-software", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ deviceId }),
-      })
-
-      console.log("📡 API Response status:", response.status)
-      console.log("📡 API Response ok:", response.ok)
-
-      if (response.ok) {
-        const software = await response.json()
-        console.log("✅ API returned software:", software)
-        console.log("📊 Number of software entries received:", software.length)
-
-        if (software.length > 0) {
-          console.log("📝 Sample software:", software[0])
-        }
-
-        setDeviceSoftware(software)
-      } else {
-        const errorData = await response.json()
-        console.error("❌ API Error:", errorData)
-        setSoftwareError(`API Error: ${errorData.error || "Unknown error"}`)
-      }
-    } catch (error) {
-      console.error("❌ Failed to load software:", error)
-      setSoftwareError(`Network Error: ${error instanceof Error ? error.message : "Unknown error"}`)
-    } finally {
-      setIsLoadingSoftware(false)
-      console.log("🏁 Finished loading software")
-    }
-  }, [])
-
-  // Load device files function
-  const loadDeviceFiles = useCallback(async (deviceId: string) => {
-    // Note: We cannot rely on selectedDevice.files inside useCallback without adding it to dependencies
-    // which would cause an infinite loop if we update selectedDevice.
-    // Instead, the check should happen in the useEffect or inside the functional update.
-
-    console.log("🚀 Starting to load files for device:", deviceId)
-
-    try {
-      console.log("📡 Making API call to /api/device-files")
-      const response = await fetch("/api/device-files", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ deviceId }),
-      })
-
-      console.log("📡 API Response status:", response.status)
-      console.log("📡 API Response ok:", response.ok)
-
-      if (response.ok) {
-        const deviceFilesData = await response.json()
-        console.log("✅ API returned device files:", deviceFilesData)
-        console.log("📊 Number of files received:", deviceFilesData.files?.length || 0)
-
-        // Update selectedDevice with files data using functional update to avoid race conditions
-        setSelectedDevice((prevDevice) => {
-          if (prevDevice && prevDevice.deviceId === deviceId) {
-            return {
-              ...prevDevice,
-              files: deviceFilesData.files || [],
-              totalFiles: deviceFilesData.totalFiles || 0,
-              matchingFiles: deviceFilesData.matchingFiles || [],
-            }
-          }
-          return prevDevice
-        })
-      } else {
-        const errorData = await response.json()
-        console.error("❌ API Error loading files:", errorData)
-      }
-    } catch (error) {
-      console.error("❌ Failed to load files:", error)
-    }
-  }, [])
-
-  // Load device info, credentials, software, and files when device is selected and reset password visibility
-  // Use deviceId as dependency instead of entire selectedDevice object to prevent infinite loop
+  // Load device info, credentials, software, and files when device is selected
   useEffect(() => {
     if (selectedDevice?.deviceId) {
-      console.log("🔄 Device selected, loading device info, credentials, software, and files for:", selectedDevice.deviceId)
-      setShowPasswords(false) // Reset password visibility for each device
-      setCredentialsSearchQuery("") // Reset search query for each device
-      setSoftwareSearchQuery("") // Reset software search query for each device
-      loadDeviceInfo(selectedDevice.deviceId)
+      console.log("🔄 Device selected, loading data for:", selectedDevice.deviceId)
+      setShowPasswords(false)
+      setCredentialsSearchQuery("")
+      setSoftwareSearchQuery("")
+
+      // Load all data
+      loadDeviceInfo(selectedDevice.deviceId, updateSelectedDevice)
       loadDeviceCredentials(selectedDevice.deviceId)
       loadDeviceSoftware(selectedDevice.deviceId)
+
       // Only load files if they haven't been loaded yet (empty array means not loaded)
       if (!selectedDevice.files || selectedDevice.files.length === 0) {
-        loadDeviceFiles(selectedDevice.deviceId)
+        loadDeviceFiles(selectedDevice.deviceId, updateSelectedDevice)
       }
     }
-  }, [selectedDevice?.deviceId, selectedDevice?.files, loadDeviceInfo, loadDeviceCredentials, loadDeviceSoftware, loadDeviceFiles]) // Added dependencies
+  }, [
+    selectedDevice?.deviceId,
+    // We only want to trigger when deviceId changes, but we need to check if files are loaded.
+    // Including selectedDevice.files.length might cause loops if we aren't careful,
+    // but the check `length === 0` should be safe if we only add files once.
+    // Ideally we rely on deviceId changing.
+    // Let's stick to deviceId for the main trigger.
+    // Actually, we need to pass `updateSelectedDevice` which is stable.
+  ])
+
+  // Refined useEffect dependencies to avoid infinite loops or stale closures
+  // We use a ref or separate effect if we want to be strict, but here:
+  // We want to run this when selectedDevice.deviceId CHANGES.
+  // The logic inside checks if files are missing.
+  // So we can just depend on selectedDevice.deviceId.
+
+  // However, `selectedDevice` object changes reference when we update it (e.g. with files).
+  // So we must NOT depend on `selectedDevice` object, only `selectedDevice.deviceId`.
+
+  // But we need to check `files.length` inside. We can use functional update or check before calling.
+  // The safe way:
+  // 1. Effect depends on `selectedDevice?.deviceId`.
+  // 2. Inside, we can access the *current* files via `selectedDevice.files` if we include it in deps,
+  //    OR we assume initial load has 0 files.
+  //    BUT if we include `selectedDevice.files` in deps, updating files will re-trigger.
+  //    We have `if length === 0` guard, so it won't re-fetch if files are > 0.
+  //    So it is safe.
+
+  // Re-writing the effect with proper deps:
+   /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (selectedDevice?.deviceId) {
+        loadDeviceInfo(selectedDevice.deviceId, updateSelectedDevice)
+        loadDeviceCredentials(selectedDevice.deviceId)
+        loadDeviceSoftware(selectedDevice.deviceId)
+
+        if (!selectedDevice.files || selectedDevice.files.length === 0) {
+            loadDeviceFiles(selectedDevice.deviceId, updateSelectedDevice)
+        }
+    }
+  }, [selectedDevice?.deviceId])
+  /* eslint-enable react-hooks/exhaustive-deps */
+
 
   // Prepare typing sentences for the typing effect
   const totalCreds =
@@ -387,158 +236,6 @@ export default function SearchPage() {
     }
   }
 
-  // Add function for downloading all device data
-  const handleDownloadAllDeviceData = async (deviceId: string, deviceName: string) => {
-    try {
-      const response = await fetch("/api/download-device", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ deviceId }),
-      })
-
-      if (response.ok) {
-        const blob = await response.blob()
-        // Only use browser APIs in browser environment
-        if (typeof window !== 'undefined' && window.URL && document) {
-          const url = window.URL.createObjectURL(blob)
-          const a = document.createElement("a")
-          a.href = url
-          a.download = `${deviceName}_complete_data.zip`
-          document.body.appendChild(a)
-          a.click()
-          window.URL.revokeObjectURL(url)
-          document.body.removeChild(a)
-        } else {
-          console.error("Download not supported in this environment")
-        }
-      } else {
-        console.error("Failed to download device data")
-      }
-    } catch (error) {
-      console.error("Download error:", error)
-    }
-  }
-
-  const formatFileSize = (size?: number) => {
-    if (!size) return ""
-    if (size < 1024) return `${size} B`
-    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`
-  }
-
-  const renderASCIITree = (nodes: TreeNode[], isLast: boolean[] = []): React.ReactNode => {
-    return nodes.map((node, index) => {
-      const isLastChild = index === nodes.length - 1
-      const currentIsLast = [...isLast, isLastChild]
-
-      // Build ASCII prefix with proper tree characters
-      let prefix = ""
-      for (let i = 0; i < isLast.length; i++) {
-        if (i === isLast.length - 1) {
-          prefix += isLast[i] ? "└── " : "├── "
-        } else {
-          prefix += isLast[i] ? "    " : "│   "
-        }
-      }
-
-      // Determine file type and action
-      const fileExtension = node.name.toLowerCase().split(".").pop() || ""
-      const viewableExtensions = [
-        "txt",
-        "log",
-        "json",
-        "xml",
-        "html",
-        "htm",
-        "css",
-        "js",
-        "csv",
-        "ini",
-        "cfg",
-        "conf",
-        "md",
-        "sql",
-      ]
-      const isViewable =
-        viewableExtensions.includes(fileExtension) ||
-        node.name.toLowerCase().includes("password") ||
-        !node.name.includes(".")
-
-      // Icon based on file type
-      let icon: React.ReactNode = <Folder className="inline h-4 w-4 text-blue" />
-      let actionIcon: React.ReactNode = ""
-      let actionText = ""
-      let isClickable = false
-
-      if (!node.isDirectory) {
-        if (isViewable && node.hasContent) {
-          icon = <FileText className="inline h-4 w-4 text-green" />
-          actionIcon = <Eye className="inline h-4 w-4 text-blue ml-1" />
-          actionText = "Click to view content"
-          isClickable = true
-        } else if (["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(fileExtension) && node.hasContent) {
-          icon = <ImageIcon className="inline h-4 w-4 text-purple" />
-          actionIcon = <Eye className="inline h-4 w-4 text-blue ml-1" />
-          actionText = "Click to preview image"
-          isClickable = true
-        } else if (["pdf"].includes(fileExtension)) {
-          icon = <Book className="inline h-4 w-4 text-red" />
-        } else if (["doc", "docx"].includes(fileExtension)) {
-          icon = <Book className="inline h-4 w-4 text-blue" />
-        } else if (["xls", "xlsx"].includes(fileExtension)) {
-          icon = <Book className="inline h-4 w-4 text-green" />
-        } else if (["ppt", "pptx"].includes(fileExtension)) {
-          icon = <Book className="inline h-4 w-4 text-yellow" />
-        } else if (["zip", "rar", "7z"].includes(fileExtension)) {
-          icon = <Package className="inline h-4 w-4 text-orange" />
-        } else {
-          icon = <FileText className="inline h-4 w-4 text-gray" />
-        }
-      }
-
-      const matchBadge = node.hasMatch ? " [Match]" : ""
-      const sizeBadge = node.size ? ` ${formatFileSize(node.size)}` : ""
-
-      return (
-        <div key={`${node.path}-${index}`}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className={`font-mono text-sm py-1 px-2 rounded transition-colors ${
-                  node.hasMatch
-                    ? "bg-yellow/20 text-yellow font-medium"
-                    : "text-muted-foreground"
-                } ${isClickable ? "hover:bg-blue/20 cursor-pointer" : "cursor-default"}`}
-                onClick={() => {
-                  if (isClickable) {
-                    handleFileClick(selectedDevice!.deviceId, node.path, node.name, node.hasContent || false)
-                  }
-                }}
-              >
-                <span className="text-muted-foreground">{prefix}</span>
-                <span className="mr-1">{icon}</span>
-                <span className={node.hasMatch ? "font-semibold" : ""}>{node.name}</span>
-                {matchBadge && <span className="text-yellow font-bold">{matchBadge}</span>}
-                {actionIcon && <span className="text-blue">{actionIcon}</span>}
-                {sizeBadge && <span className="text-muted-foreground text-xs ml-1">{sizeBadge}</span>}
-              </div>
-            </TooltipTrigger>
-            {!node.isDirectory && (
-              <TooltipContent side="right" className="bg-card/50 border border-border shadow-lg p-2">
-                <div className="text-xs text-foreground">{actionText}</div>
-              </TooltipContent>
-            )}
-          </Tooltip>
-
-          {/* Render children recursively */}
-          {node.children.length > 0 && <div>{renderASCIITree(node.children, currentIsLast)}</div>}
-        </div>
-      )
-    })
-  }
-
   return (
     <TooltipProvider>
       <div className="flex flex-col min-h-screen bg-background">
@@ -625,7 +322,7 @@ export default function SearchPage() {
           setSoftwareSearchQuery={setSoftwareSearchQuery}
           onRetrySoftware={() => selectedDevice && loadDeviceSoftware(selectedDevice.deviceId)}
           onFileClick={handleFileClick}
-          onDownloadAllData={handleDownloadAllDeviceData}
+          onDownloadAllData={downloadDeviceData}
         />
 
         {/* File Content Dialog */}
