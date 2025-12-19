@@ -1,7 +1,7 @@
 import { writeFile, unlink } from "fs/promises"
 import { ensureDirectory } from "@/lib/upload/fs-utils"
 import path from "path"
-import { initializeDatabase } from "@/lib/mysql"
+import { initializeDatabase } from "@/lib/db"
 // Import versi streaming (untuk file besar)
 import { processZipStream } from "./zip-processor-stream"
 // Import versi original (untuk backward compatibility dengan file kecil)

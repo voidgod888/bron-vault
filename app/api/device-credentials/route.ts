@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { logInfo, logError } from "@/lib/logger"
 import { deviceCredentialsSchema, validateData, createValidationErrorResponse } from "@/lib/validation"
 import { validateRequest } from "@/lib/auth"
@@ -24,11 +24,10 @@ export async function POST(request: NextRequest) {
     const { deviceId } = validation.data
     logInfo(`Loading credentials for device: ${deviceId}`, undefined, 'Device Credentials API')
 
-    // First, verify the device exists (ClickHouse)
-    // NOTE: device_id is VARCHAR(255) in schema, so {deviceId:String} is correct
-    const deviceCheck = (await executeClickHouseQuery(
-      "SELECT device_id, device_name FROM devices WHERE device_id = {deviceId:String}",
-      { deviceId }
+    // First, verify the device exists (SingleStore)
+    const deviceCheck = (await executeQuery(
+      "SELECT device_id, device_name FROM devices WHERE device_id = ?",
+      [deviceId]
     )) as any[]
 
     console.log("📱 Device check result:", deviceCheck)
@@ -38,40 +37,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Device not found" }, { status: 404 })
     }
 
-    // ENHANCED: Get credentials with flexible browser handling (ClickHouse)
-    // NOTE: device_id is VARCHAR(255) in schema, so {deviceId:String} is correct
-    const credentials = (await executeClickHouseQuery(
+    // ENHANCED: Get credentials with flexible browser handling (SingleStore)
+    const credentials = (await executeQuery(
       `SELECT 
-        coalesce(browser, 'Unknown') as browser,
-        coalesce(url, '') as url, 
-        coalesce(username, '') as username, 
-        coalesce(password, '') as password,
+        COALESCE(browser, 'Unknown') as browser,
+        COALESCE(url, '') as url,
+        COALESCE(username, '') as username,
+        COALESCE(password, '') as password,
         file_path
        FROM credentials 
-       WHERE device_id = {deviceId:String} 
+       WHERE device_id = ?
        ORDER BY url, username`,
-      { deviceId },
+      [deviceId],
     )) as any[]
 
     console.log(`📊 Found ${credentials.length} credentials for device ${deviceId}`)
 
-    // Debug: Check total credentials in database (ClickHouse)
-    const totalCredentials = (await executeClickHouseQuery("SELECT count() as count FROM credentials")) as any[]
+    // Debug: Check total credentials in database
+    const totalCredentials = (await executeQuery("SELECT COUNT(*) as count FROM credentials")) as any[]
     console.log(`📊 Total credentials in database: ${JSON.stringify(totalCredentials)}`)
 
-    // Debug: Check credentials with device info (ClickHouse)
-    const credentialsWithDevice = (await executeClickHouseQuery(
+    // Debug: Check credentials with device info
+    const credentialsWithDevice = (await executeQuery(
       `SELECT c.*, d.device_name 
        FROM credentials c 
        INNER JOIN devices d ON c.device_id = d.device_id 
-       WHERE c.device_id = {deviceId:String}`,
-      { deviceId },
+       WHERE c.device_id = ?`,
+      [deviceId],
     )) as any[]
 
     console.log(`🔍 Credential details with device info: ${JSON.stringify(credentialsWithDevice)}`)
 
     // Format credentials for display - Handle missing browser gracefully
-    const formattedCredentials = credentials.map((cred) => ({
+    const formattedCredentials = credentials.map((cred: any) => ({
       browser: cred.browser === "Unknown" || !cred.browser ? null : cred.browser,
       url: cred.url || "",
       username: cred.username || "",

@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@clickhouse/client':
-        specifier: ^1.14.0
-        version: 1.15.0
       '@hookform/resolvers':
         specifier: ^3.9.1
         version: 3.10.0(react-hook-form@7.68.0(react@18.3.1))
@@ -253,13 +250,6 @@ packages:
   '@babel/runtime@7.28.4':
     resolution: {integrity: sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==}
     engines: {node: '>=6.9.0'}
-
-  '@clickhouse/client-common@1.15.0':
-    resolution: {integrity: sha512-/1BXaNNsBzH2w5ALWiH6M9zS+cJwlM9uMnMj9e8ETwvDjJzO+nIYlyxzp8Prc+9pEDZ5iAilZ4F8c0YVCzzNaA==}
-
-  '@clickhouse/client@1.15.0':
-    resolution: {integrity: sha512-QmW+p4c/r0oa3X6Un6lcBs4GZtJEQUdvf//x8GeqM5ru6m4oIUg3WwvermP3HE31kpEGoFOQfKbMN5ooR5gvNw==}
-    engines: {node: '>=16'}
 
   '@cryptography/aes@0.1.1':
     resolution: {integrity: sha512-PcYz4FDGblO6tM2kSC+VzhhK62vml6k6/YAkiWtyPvrgJVfnDRoHGDtKn5UiaRRUrvUTTocBpvc2rRgTCqxjsg==}
@@ -4103,12 +4093,6 @@ snapshots:
   '@alloc/quick-lru@5.2.0': {}
 
   '@babel/runtime@7.28.4': {}
-
-  '@clickhouse/client-common@1.15.0': {}
-
-  '@clickhouse/client@1.15.0':
-    dependencies:
-      '@clickhouse/client-common': 1.15.0
 
   '@cryptography/aes@0.1.1': {}
 

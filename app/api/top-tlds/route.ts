@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeMySQLQuery } from "@/lib/mysql"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { validateRequest } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     // Check cache first (analytics_cache tetap di MySQL - operational table)
     console.log("📊 [TOP-TLDS] Checking cache...")
-    const cacheResult = (await executeMySQLQuery(
+    const cacheResult = (await executeQuery(
       "SELECT cache_data FROM analytics_cache WHERE cache_key = 'top_tlds' AND expires_at > NOW()",
     )) as any[]
 
@@ -35,7 +34,6 @@ export async function GET(request: NextRequest) {
         if (typeof cachedDataRaw === "string") {
           cachedData = JSON.parse(cachedDataRaw)
         } else if (typeof cachedDataRaw === "object" && cachedDataRaw !== null) {
-          // Already an object (possibly due to previous bad write), use as-is
           cachedData = cachedDataRaw
         } else {
           throw new Error("Unsupported cache_data type")
@@ -58,13 +56,13 @@ export async function GET(request: NextRequest) {
 
     console.log("📊 [TOP-TLDS] Calculating fresh top TLDs...")
 
-    // Get top TLDs from credentials table (ClickHouse)
-    // Convert: COUNT(DISTINCT device_id) -> uniq(device_id) untuk performa lebih baik
-    const topTlds = await executeClickHouseQuery(`
+    // Get top TLDs from credentials table (SingleStore)
+    // SingleStore: COUNT(*) as count, COUNT(DISTINCT device_id) as affected_devices
+    const topTlds = (await executeQuery(`
       SELECT 
         tld,
-        count() as count,
-        uniq(device_id) as affected_devices
+        COUNT(*) as count,
+        COUNT(DISTINCT device_id) as affected_devices
       FROM credentials 
       WHERE tld IS NOT NULL 
         AND tld != ''
@@ -75,26 +73,32 @@ export async function GET(request: NextRequest) {
       GROUP BY tld 
       ORDER BY count DESC, affected_devices DESC
       LIMIT 10
-    `)
+    `)) as any[]
+
+    // Cast BigInt to Number for JSON serialization
+    const formattedTlds = topTlds.map(row => ({
+      tld: row.tld,
+      count: Number(row.count) || 0,
+      affected_devices: Number(row.affected_devices) || 0
+    }))
 
     console.log(
-      `📊 [TOP-TLDS] Found ${Array.isArray(topTlds) ? (topTlds as any[]).length : "?"} top TLDs`,
+      `📊 [TOP-TLDS] Found ${formattedTlds.length} top TLDs`,
     )
-    console.log("📊 [TOP-TLDS] Sample data:", Array.isArray(topTlds) ? (topTlds as any[]).slice(0, 2) : topTlds)
+    console.log("📊 [TOP-TLDS] Sample data:", formattedTlds.slice(0, 2))
 
-    // Serialize for cache (safe fallback)
+    // Serialize for cache
     let serialized: string
     try {
-      serialized = JSON.stringify(topTlds)
+      serialized = JSON.stringify(formattedTlds)
     } catch (e) {
       console.error("📊 [TOP-TLDS] Failed to serialize topTlds for cache:", e)
-      serialized = "[]" // fallback empty array
+      serialized = "[]"
     }
 
-    // Cache for 10 minutes (upsert)
-    // analytics_cache tetap di MySQL (operational table)
+    // Cache for 10 minutes
     console.log("📊 [TOP-TLDS] Caching results...")
-    await executeMySQLQuery(
+    await executeQuery(
       `
       INSERT INTO analytics_cache (cache_key, cache_data, expires_at)
       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))
@@ -104,7 +108,7 @@ export async function GET(request: NextRequest) {
     )
 
     console.log("📊 [TOP-TLDS] Returning fresh data")
-    return NextResponse.json(topTlds)
+    return NextResponse.json(formattedTlds)
   } catch (error) {
     console.error("❌ [TOP-TLDS] Error:", error)
     return NextResponse.json(

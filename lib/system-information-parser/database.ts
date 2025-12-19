@@ -1,6 +1,6 @@
 // Database operations for System Information Parser
 
-import { executeQuery } from '@/lib/mysql';
+import { executeQuery } from '@/lib/db';
 import { ParsedLogData } from './types';
 import { isValidIP } from './helpers';
 

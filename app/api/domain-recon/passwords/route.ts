@@ -1,58 +1,47 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { validateRequest } from "@/lib/auth"
 
-/**
- * Build WHERE clause for domain matching that supports subdomains (ClickHouse version)
- * OPTIMIZED: Avoid heavy string manipulation in SQL
- * Uses named parameters for ClickHouse
- */
-function buildDomainWhereClause(targetDomain: string): { whereClause: string; params: Record<string, string> } {
-  // Use ilike for case-insensitive matching (data in DB might be mixed case)
+function buildDomainWhereClause(targetDomain: string): { whereClause: string; params: any[] } {
+  // Use LIKE for case-insensitive matching
   const whereClause = `WHERE (
-    c.domain = {domain:String} OR 
-    c.domain ilike concat('%.', {domain:String}) OR
-    c.url ilike {pattern1:String} OR
-    c.url ilike {pattern2:String}
+    c.domain = ? OR
+    c.domain LIKE ? OR
+    c.url LIKE ? OR
+    c.url LIKE ?
   ) AND c.domain IS NOT NULL`
   
   return {
     whereClause,
-    params: {
-      domain: targetDomain,                              // Exact domain match
-      pattern1: `%://${targetDomain}/%`,                   // Match: https://target.com/
-      pattern2: `%://${targetDomain}:%`                    // Match: https://target.com:8080/
-    }
+    params: [
+      targetDomain,
+      `%.${targetDomain}`,
+      `%://${targetDomain}/%`,
+      `%://${targetDomain}:%`
+    ]
   }
 }
 
-/**
- * Build WHERE clause for keyword search (ClickHouse version)
- * OPTIMIZED: Use simple LIKE instead of heavy string manipulation
- * Uses ilike for case-insensitive search
- */
-function buildKeywordWhereClause(keyword: string, mode: 'domain-only' | 'full-url' = 'full-url'): { whereClause: string; params: Record<string, string> } {
+function buildKeywordWhereClause(keyword: string, mode: 'domain-only' | 'full-url' = 'full-url'): { whereClause: string; params: any[] } {
   if (mode === 'domain-only') {
-    // For domain-only, check both domain column and URL (ClickHouse: use ilike)
     const whereClause = `WHERE (
-      c.domain ilike {keyword:String} OR
-      c.url ilike {pattern1:String} OR
-      c.url ilike {pattern2:String}
+      c.domain LIKE ? OR
+      c.url LIKE ? OR
+      c.url LIKE ?
     ) AND c.url IS NOT NULL`
     return {
       whereClause,
-      params: {
-        keyword: `%${keyword}%`,           // Domain column contains keyword
-        pattern1: `%://%${keyword}%/%`,     // URL contains keyword in hostname
-        pattern2: `%://%${keyword}%:%`       // URL contains keyword in hostname with port
-      }
+      params: [
+        `%${keyword}%`,
+        `%://%${keyword}%/%`,
+        `%://%${keyword}%:%`
+      ]
     }
   } else {
-    // Full URL mode: search keyword anywhere in URL (ClickHouse: use ilike)
-    const whereClause = `WHERE c.url ilike {keyword:String} AND c.url IS NOT NULL`
+    const whereClause = `WHERE c.url LIKE ? AND c.url IS NOT NULL`
     return {
       whereClause,
-      params: { keyword: `%${keyword}%` }
+      params: [`%${keyword}%`]
     }
   }
 }
@@ -72,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     let whereClause: string
-    let params: Record<string, string>
+    let params: any[]
 
     if (searchType === 'keyword') {
       const keyword = targetDomain.trim()
@@ -94,22 +83,18 @@ export async function POST(request: NextRequest) {
 
     console.log("🔑 Getting top passwords (optimized query)...")
     
-    // OPTIMIZED QUERY (ClickHouse):
-    // 1. Convert COUNT(DISTINCT device_id) -> uniq(device_id)
-    // 2. Convert LENGTH(TRIM(password)) -> length(trimBoth(password))
-    // 3. Convert REGEXP -> match
-    // Result: 1 password per device for the domain, then count how many devices use each password
-    const result = (await executeClickHouseQuery(
+    // OPTIMIZED QUERY (SingleStore/MySQL):
+    const result = (await executeQuery(
       `SELECT 
         c.password,
-        uniq(c.device_id) as total_count
+        COUNT(DISTINCT c.device_id) as total_count
       FROM credentials c
       ${whereClause}
       AND c.password IS NOT NULL
-      AND length(trimBoth(c.password)) > 2
+      AND LENGTH(TRIM(c.password)) > 2
       AND c.password NOT IN ('', ' ', 'null', 'undefined', 'N/A', 'n/a', 'none', 'None', 'NONE', 'blank', 'Blank', 'BLANK', 'empty', 'Empty', 'EMPTY', '[NOT_SAVED]')
       AND c.password NOT LIKE '%[NOT_SAVED]%'
-      AND NOT match(c.password, '^[[:space:]]*$')
+      AND c.password NOT REGEXP '^[[:space:]]*$'
       GROUP BY c.password
       ORDER BY total_count DESC, c.password ASC
       LIMIT 10`,
@@ -139,4 +124,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

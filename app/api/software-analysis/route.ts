@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery as executeMySQLQuery } from "@/lib/mysql";
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse";
+import { executeQuery } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 interface SoftwareData {
@@ -18,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Check cache first (analytics_cache remains in MySQL - operational table)
-    const cacheResult = (await executeMySQLQuery(
+    const cacheResult = (await executeQuery(
       "SELECT cache_data FROM analytics_cache WHERE cache_key = 'software_analysis' AND expires_at > NOW()"
     )) as any[]
 
@@ -42,9 +41,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Query to get software grouped by name and version for attack surface management
-    // ClickHouse: Convert COUNT(DISTINCT device_id) -> uniq(device_id)
-    const results = await executeClickHouseQuery(`
-      SELECT software_name, version, uniq(device_id) as count
+    // SingleStore: COUNT(DISTINCT device_id)
+    const results = await executeQuery(`
+      SELECT software_name, version, COUNT(DISTINCT device_id) as count
       FROM software 
       WHERE software_name IS NOT NULL AND software_name != ''
       GROUP BY software_name, version
@@ -69,8 +68,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Cache for 10 minutes
-    // analytics_cache remains in MySQL (operational table)
-    await executeMySQLQuery(
+    await executeQuery(
       "INSERT INTO analytics_cache (cache_key, cache_data, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE)) ON DUPLICATE KEY UPDATE cache_data = VALUES(cache_data), expires_at = VALUES(expires_at)",
       ["software_analysis", JSON.stringify(result)]
     );
@@ -84,4 +82,4 @@ export async function GET(request: NextRequest) {
       error: "Internal server error" 
     }, { status: 500 });
   }
-} 
+}

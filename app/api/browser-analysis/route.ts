@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery as executeMySQLQuery } from "@/lib/mysql";
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse";
+import { executeQuery } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
 
 interface BrowserData {
@@ -17,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Check cache first (analytics_cache tetap di MySQL - operational table)
-    const cacheResult = (await executeMySQLQuery(
+    const cacheResult = (await executeQuery(
       "SELECT cache_data FROM analytics_cache WHERE cache_key = 'browser_analysis' AND expires_at > NOW()"
     )) as any[]
 
@@ -41,12 +40,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Optimized query: Get unique browsers per device_id directly with COUNT
-    // This processes much less data than fetching all rows
-    // ClickHouse: Convert COUNT(DISTINCT device_id) -> uniq(device_id)
-    const results = await executeClickHouseQuery(`
+    // SingleStore: COUNT(DISTINCT device_id)
+    const results = await executeQuery(`
       SELECT 
         browser,
-        uniq(device_id) as device_count
+        COUNT(DISTINCT device_id) as device_count
       FROM credentials 
       WHERE browser IS NOT NULL AND browser != ''
       GROUP BY browser
@@ -113,8 +111,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Cache for 10 minutes
-    // analytics_cache tetap di MySQL (operational table)
-    await executeMySQLQuery(
+    await executeQuery(
       "INSERT INTO analytics_cache (cache_key, cache_data, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE)) ON DUPLICATE KEY UPDATE cache_data = VALUES(cache_data), expires_at = VALUES(expires_at)",
       ["browser_analysis", JSON.stringify(result)]
     );
@@ -128,4 +125,4 @@ export async function GET(request: NextRequest) {
       error: "Internal server error" 
     }, { status: 500 });
   }
-} 
+}

@@ -1,4 +1,4 @@
-import { initializeDatabase } from '../lib/mysql';
+import { initializeDatabase } from '../lib/db';
 
 async function main() {
   console.log('Running database initialization to ensure schema...');

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { pool } from "@/lib/mysql"
+import { pool } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import type { RowDataPacket } from "mysql2"
 import { generateToken, getSecureCookieOptions } from "@/lib/auth"

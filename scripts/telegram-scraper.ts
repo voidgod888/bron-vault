@@ -1,23 +1,27 @@
 import { TelegramClient } from "telegram"
 import { StringSession } from "telegram/sessions"
-import { executeQuery, initializeDatabase } from "../lib/mysql"
+import { executeQuery, initializeDatabase } from "../lib/db"
 import { processFileUploadFromPath } from "../lib/upload/file-upload-processor"
 import { telegramConfig } from "../lib/telegram-config"
 import fs from "fs"
 import path from "path"
 import { promisify } from "util"
 import { pipeline } from "stream"
-import input from "input" // Optional, for CLI interaction if needed
 // @ts-ignore
 import mime from "mime-types"
+
+// Ensure dynamic imports for GramJS to avoid issues in some environments (e.g. Next.js edge, though this is a script)
+// Keeping imports standard here as it's a standalone script.
 
 const streamPipeline = promisify(pipeline)
 
 async function getSources() {
+  // Use SingleStore query
   return await executeQuery("SELECT * FROM sources WHERE enabled = TRUE AND type = 'telegram'") as any[]
 }
 
 async function updateLastScraped(id: number) {
+  // Use SingleStore query
   await executeQuery("UPDATE sources SET last_scraped_at = NOW() WHERE id = ?", [id])
 }
 
@@ -59,9 +63,9 @@ async function downloadMedia(client: TelegramClient, message: any, downloadDir: 
 }
 
 async function main() {
-  console.log("🚀 Starting Telegram Scraper...")
+  console.log("🚀 Starting Telegram Scraper (SingleStore Enabled)...")
 
-  // 1. Initialize DB
+  // 1. Initialize DB (ensures schema and connection)
   await initializeDatabase()
 
   // 2. Load Config
@@ -97,9 +101,7 @@ async function main() {
         // Resolve entity (channel/user)
         const entity = await client.getEntity(source.identifier)
 
-        // Fetch messages (limit to last 50 for now, or use last_scraped_at logic in future)
-        // Ideally we should store the last message ID processed per source to avoid duplicates.
-        // For now, we rely on the file hash check in the upload processor to avoid re-processing.
+        // Fetch messages (limit to last 20 for now)
         const messages = await client.getMessages(entity, { limit: 20 })
 
         console.log(`   Found ${messages.length} messages`)
@@ -123,10 +125,6 @@ async function main() {
                         const logger = (msg: string, type: any) => console.log(`      [Processor] ${type?.toUpperCase() || 'INFO'}: ${msg}`)
 
                         // Process the file
-                        // Note: processFileUploadFromPath expects a ZIP. If text file, we might need to zip it or handle separately.
-                        // The current requirement mentions "Both zip and text file".
-                        // processFileUploadFromPath checks for .zip extension.
-
                         if (filePath.toLowerCase().endsWith(".zip")) {
                              await processFileUploadFromPath(
                                 filePath,
@@ -139,8 +137,6 @@ async function main() {
                         } else {
                             console.log("      ⚠️ Non-zip files not yet fully supported by processor directly (needs packing). Skipping for now.")
                             // TODO: Implement text file handling (e.g. read and insert directly or wrap in zip)
-                            // For now we just skip non-zips to be safe with existing processor.
-                            // Actually, let's delete the temp file
                             fs.unlinkSync(filePath)
                         }
                     }

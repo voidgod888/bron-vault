@@ -1,4 +1,4 @@
-import { executeQuery, ensureAppSettingsTable } from "@/lib/mysql"
+import { executeQuery, ensureAppSettingsTable } from "@/lib/db"
 
 export interface AppSetting {
   id: number

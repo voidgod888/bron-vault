@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery } from "@/lib/mysql"
+import { executeQuery } from "@/lib/db"
 
 export async function POST(request: NextRequest) {
   try {

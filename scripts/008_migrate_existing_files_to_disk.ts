@@ -18,7 +18,7 @@
  *   2. Ensure uploads/extracted_files directory exists and is writable
  */
 
-import { executeQuery, pool } from "../lib/mysql"
+import { executeQuery, pool } from "../lib/db"
 import { readFile, writeFile, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { executeQuery } from "@/lib/mysql"
+import { executeQuery } from "@/lib/db"
 import { existsSync, createReadStream } from "fs"
 import { readFile } from "fs/promises"
 import path from "path"

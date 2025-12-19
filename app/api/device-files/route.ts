@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { logInfo, logError } from "@/lib/logger"
 import { deviceCredentialsSchema, validateData, createValidationErrorResponse } from "@/lib/validation"
 import { validateRequest } from "@/lib/auth"
@@ -24,11 +24,10 @@ export async function POST(request: NextRequest) {
     const { deviceId } = validation.data
     logInfo(`Loading files for device: ${deviceId}`, undefined, 'Device Files API')
 
-    // First, verify the device exists and get device info (ClickHouse)
-    // NOTE: device_id is VARCHAR(255) in schema, so {deviceId:String} is correct
-    const deviceCheck = (await executeClickHouseQuery(
-      "SELECT device_id, device_name, upload_batch, total_files FROM devices WHERE device_id = {deviceId:String}",
-      { deviceId },
+    // First, verify the device exists and get device info (SingleStore)
+    const deviceCheck = (await executeQuery(
+      "SELECT device_id, device_name, upload_batch, total_files FROM devices WHERE device_id = ?",
+      [deviceId],
     )) as any[]
 
     console.log("📱 Device check result:", deviceCheck)
@@ -40,37 +39,32 @@ export async function POST(request: NextRequest) {
 
     const device = deviceCheck[0]
 
-    // Get all files for this device (ClickHouse)
-    // Only files with local_file_path (all files should be migrated to disk)
-    // NOTE: device_id is VARCHAR(255) in schema, so {deviceId:String} is correct
-    // NOTE: has_content returns 1 or 0 (Number) - will be converted to Boolean in mapping
-    const files = (await executeClickHouseQuery(
+    // Get all files for this device (SingleStore)
+    const files = (await executeQuery(
       `SELECT 
         file_path,
         file_name,
-        coalesce(parent_path, '') as parent_path,
+        COALESCE(parent_path, '') as parent_path,
         is_directory,
-        coalesce(file_size, 0) as file_size,
-        if(local_file_path IS NOT NULL, 1, 0) as has_content,
+        COALESCE(file_size, 0) as file_size,
+        IF(local_file_path IS NOT NULL, 1, 0) as has_content,
         file_type
        FROM files 
-       WHERE device_id = {deviceId:String} 
+       WHERE device_id = ?
        ORDER BY file_path`,
-      { deviceId },
+      [deviceId],
     )) as any[]
 
     console.log(`📊 Found ${files.length} files for device ${deviceId}`)
 
     // Format files for display
-    // Note: has_content dari ClickHouse adalah 1 atau 0 (Number), perlu convert ke Boolean
-    const formattedFiles = files.map((file) => ({
+    const formattedFiles = files.map((file: any) => ({
       file_path: file.file_path || "",
       file_name: file.file_name || "",
       parent_path: file.parent_path || "",
-      is_directory: file.is_directory || false,
+      is_directory: Boolean(file.is_directory),
       file_size: file.file_size || 0,
-      // Convert Number (1/0) to Boolean explicitly
-      has_content: Boolean(file.has_content && file.has_content !== 0),
+      has_content: Boolean(file.has_content),
     }))
 
     // Return device info with files
@@ -80,8 +74,8 @@ export async function POST(request: NextRequest) {
       uploadBatch: device.upload_batch,
       totalFiles: device.total_files || files.length,
       files: formattedFiles,
-      matchingFiles: [], // Empty for now, can be populated if needed
-      matchedContent: [], // Empty for now, can be populated if needed
+      matchingFiles: [],
+      matchedContent: [],
     }
 
     console.log(`✅ Returning device files data with ${formattedFiles.length} files`)
@@ -98,4 +92,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

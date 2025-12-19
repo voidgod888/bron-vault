@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { validateRequest } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
@@ -65,92 +65,67 @@ async function getCredentialsDataOptimized(
   const sortOrder = (pagination?.sortOrder || 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
 
   // ==========================================
-  // 1. BUILD PREWHERE (Main Table Filters)
+  // BUILD WHERE CLAUSE
   // ==========================================
-  // PREWHERE is the key to speed in ClickHouse. 
-  // It filters before JOIN and before reading heavy columns.
   
-  let prewhereConditions: string[] = []
-  const params: Record<string, any> = {}
+  let whereConditions: string[] = []
+  const params: any[] = []
 
   if (searchType === 'domain') {
-    // DOMAIN OPTIMIZATION:
-    // 1. Check Exact Match domain
-    // 2. Check Subdomain using endsWith (much faster than ilike/regex)
-    // 3. Fallback to URL pattern match only if needed
-    
-    params['targetDomain'] = query
-    params['dotTargetDomain'] = '.' + query
-    
-    // Logic: Domain column exact match OR Domain column ends with .target.com
-    // This leverages suffix index if available, or at least fast string scan
-    prewhereConditions.push(`(
-      c.domain = {targetDomain:String} OR 
-      endsWith(c.domain, {dotTargetDomain:String}) OR
-      c.url ilike {urlPattern:String} 
+    // DOMAIN MATCHING
+    // Logic: Domain column exact match OR Domain column ends with .target.com (using LIKE) OR URL pattern
+    whereConditions.push(`(
+      c.domain = ? OR
+      c.domain LIKE ? OR
+      c.url LIKE ?
     )`)
-    // Fallback URL pattern for catch-all
-    params['urlPattern'] = `%${query}%`
-
+    params.push(query)
+    params.push(`%.${query}`)
+    params.push(`%${query}%`)
   } else {
     // KEYWORD SEARCH
-    params['keyword'] = query
-    params['likeKeyword'] = `%${query}%`
-    
     if (keywordMode === 'domain-only') {
-      prewhereConditions.push(`(c.domain ilike {likeKeyword:String})`)
+      whereConditions.push(`(c.domain LIKE ?)`)
+      params.push(`%${query}%`)
     } else {
-      // Optimization: multiSearchAnyCase is faster than OR OR OR
-      // But for simplicity and param binding, we use ilike in PREWHERE 
-      // because PREWHERE already significantly reduces cost.
-      prewhereConditions.push(`(c.url ilike {likeKeyword:String} OR c.domain ilike {likeKeyword:String})`)
+      whereConditions.push(`(c.url LIKE ? OR c.domain LIKE ?)`)
+      params.push(`%${query}%`)
+      params.push(`%${query}%`)
     }
   }
 
-  // Additional Filters to PREWHERE (To filter faster at the start)
+  // Additional Filters
   if (filters?.subdomain) {
-    prewhereConditions.push(`c.url ilike {subdomainFilter:String}`)
-    params['subdomainFilter'] = `%${filters.subdomain}%`
+    whereConditions.push(`c.url LIKE ?`)
+    params.push(`%${filters.subdomain}%`)
   }
   if (filters?.path) {
-    prewhereConditions.push(`c.url ilike {pathFilter:String}`)
-    params['pathFilter'] = `%${filters.path}%`
+    whereConditions.push(`c.url LIKE ?`)
+    params.push(`%${filters.path}%`)
   }
   if (filters?.browser) {
-    prewhereConditions.push(`c.browser = {browserFilter:String}`)
-    params['browserFilter'] = filters.browser
+    whereConditions.push(`c.browser = ?`)
+    params.push(filters.browser)
   }
   if (filters?.deviceId) {
-    prewhereConditions.push(`c.device_id = {deviceIdFilter:String}`)
-    params['deviceIdFilter'] = filters.deviceId
+    whereConditions.push(`c.device_id = ?`)
+    params.push(filters.deviceId)
   }
 
-  // Construct PREWHERE Clause
-  const prewhereClause = prewhereConditions.length > 0 
-    ? `PREWHERE ${prewhereConditions.join(' AND ')}` 
-    : ''
-
-  // ==========================================
-  // 2. BUILD WHERE (Join Table Filters)
-  // ==========================================
-  // Filters that require JOIN go in WHERE (executed after PREWHERE)
-
-  let whereConditions: string[] = []
   const hasGlobalSearch = searchQuery && searchQuery.trim().length > 0
 
   if (hasGlobalSearch) {
     const searchTerm = searchQuery.trim()
-    const searchParamKey = `globalSearch`
     
-    // We use conditional logic technique
     // Search in table C (url/username) OR table D (device_name)
     whereConditions.push(`(
-      positionCaseInsensitive(c.url, {${searchParamKey}:String}) > 0 OR
-      positionCaseInsensitive(c.username, {${searchParamKey}:String}) > 0 OR
-      positionCaseInsensitive(d.device_name, {${searchParamKey}:String}) > 0
+      c.url LIKE ? OR
+      c.username LIKE ? OR
+      d.device_name LIKE ?
     )`)
-    
-    params[searchParamKey] = searchTerm
+    params.push(`%${searchTerm}%`)
+    params.push(`%${searchTerm}%`)
+    params.push(`%${searchTerm}%`)
   }
 
   const whereClause = whereConditions.length > 0 
@@ -158,43 +133,39 @@ async function getCredentialsDataOptimized(
     : ''
 
   // ==========================================
-  // 3. EXECUTE COUNT (Optimized)
+  // EXECUTE COUNT
   // ==========================================
   
   let countQuery = ''
   
   if (hasGlobalSearch) {
-    // Slow Path: Must JOIN because searching device_name
-    console.log("📊 Count: Slow Path (Global Search Active)")
+    // Must JOIN because searching device_name
     countQuery = `
-      SELECT count() as total
+      SELECT COUNT(*) as total
       FROM credentials c
       LEFT JOIN devices d ON c.device_id = d.device_id
-      ${prewhereClause}
       ${whereClause}
     `
   } else {
-    // Fast Path: Main table only
-    // PREWHERE is very effective here
-    console.log("📊 Count: Fast Path (Main Table Only)")
+    // Main table only
     countQuery = `
-      SELECT count() as total
+      SELECT COUNT(*) as total
       FROM credentials c
-      ${prewhereClause}
+      ${whereClause}
     `
   }
 
-  const countResult = (await executeClickHouseQuery(countQuery, params)) as any[]
-  const total = countResult[0]?.total || 0
+  const countResult = (await executeQuery(countQuery, params)) as any[]
+  const total = Number(countResult[0]?.total || 0)
 
   // ==========================================
-  // 4. EXECUTE DATA
+  // EXECUTE DATA
   // ==========================================
 
-  // Handle Sort Log Date (Requires Join Logic)
+  // Handle Sort
   let orderByClause = ''
   if (sortBy === 'log_date') {
-    orderByClause = `ORDER BY coalesce(toDate(si.log_date), c.created_at) ${sortOrder}`
+    orderByClause = `ORDER BY COALESCE(STR_TO_DATE(si.log_date, '%Y-%m-%d'), c.created_at) ${sortOrder}`
   } else if (sortBy === 'device_id') {
     orderByClause = `ORDER BY c.device_id ${sortOrder}`
   } else {
@@ -215,15 +186,12 @@ async function getCredentialsDataOptimized(
     FROM credentials c
     LEFT JOIN devices d ON c.device_id = d.device_id
     LEFT JOIN systeminformation si ON d.device_id = si.device_id
-    ${prewhereClause} -- Heavy filters executed first here
-    ${whereClause}    -- Light/join filters executed later
+    ${whereClause}
     ${orderByClause}
     LIMIT ${Number(limit)} OFFSET ${Number(offset)}
   `
 
-  console.log("📊 Data Query Executing with PREWHERE...")
-
-  const data = (await executeClickHouseQuery(dataQuery, params)) as any[]
+  const data = (await executeQuery(dataQuery, params)) as any[]
 
   return {
     data: data.map((row: any) => ({
@@ -245,4 +213,3 @@ async function getCredentialsDataOptimized(
     },
   }
 }
-

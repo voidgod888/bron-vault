@@ -3,7 +3,7 @@ import { validateRequest } from "@/lib/auth"
 import { telegramConfig } from "@/lib/telegram-config"
 import { TelegramClient } from "telegram"
 import { StringSession } from "telegram/sessions"
-import { executeQuery } from "@/lib/mysql"
+import { executeQuery } from "@/lib/db"
 
 // This is a simplified approach. In a real specialized environment, we might need a persistent
 // process or a more complex state management for the "auth flow" (Request Code -> Wait -> Submit Code).

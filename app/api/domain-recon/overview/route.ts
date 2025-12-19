@@ -1,57 +1,52 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { validateRequest } from "@/lib/auth"
 
-/**
- * Build WHERE clause for domain matching (ClickHouse version)
- * Uses named parameters
- */
-function buildDomainWhereClause(targetDomain: string): { whereClause: string; params: Record<string, string> } {
+// ============================================
+// SINGLESTORE EXPRESSIONS (CONSTANTS)
+// ============================================
+const HOSTNAME_EXPR = `
+  SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(c.url, '/', 3), '://', -1), '/', 1), ':', 1)
+`
+
+const PATH_EXPR = `
+  CASE
+    WHEN c.url LIKE '%/%' THEN CONCAT('/', SUBSTRING_INDEX(c.url, '/', -1))
+    ELSE '/'
+  END
+`
+
+function buildDomainWhereClause(targetDomain: string): { whereClause: string; params: any[] } {
+  // Use LIKE for case-insensitive matching
   const whereClause = `WHERE (
-    c.domain = {domain:String} OR 
-    c.domain ilike concat('%.', {domain:String}) OR
-    c.url ilike {pattern1:String} OR
-    c.url ilike {pattern2:String} OR
-    c.url ilike {pattern3:String} OR
-    c.url ilike {pattern4:String}
+    c.domain = ? OR
+    c.domain LIKE ? OR
+    c.url LIKE ? OR
+    c.url LIKE ? OR
+    c.url LIKE ? OR
+    c.url LIKE ?
   ) AND c.domain IS NOT NULL`
   
   return {
     whereClause,
-    params: {
-      domain: targetDomain,
-      pattern1: `%://${targetDomain}/%`,
-      pattern2: `%://${targetDomain}:%`,
-      pattern3: `%://%.${targetDomain}/%`,
-      pattern4: `%://%.${targetDomain}:%`
-    }
+    params: [
+      targetDomain,
+      `%.${targetDomain}`,
+      `%://${targetDomain}/%`,
+      `%://${targetDomain}:%`,
+      `%://%.${targetDomain}/%`,
+      `%://%.${targetDomain}:%`
+    ]
   }
 }
 
-/**
- * Build WHERE clause for keyword search (ClickHouse version)
- */
-function buildKeywordWhereClause(keyword: string, mode: 'domain-only' | 'full-url' = 'full-url'): { whereClause: string; params: Record<string, string> } {
+function buildKeywordWhereClause(keyword: string, mode: 'domain-only' | 'full-url' = 'full-url'): { whereClause: string; params: any[] } {
   if (mode === 'domain-only') {
-    // Extract hostname safe logic without Arrays
-    // IMPORTANT: Use domain() native function with fallback extract() regex
-    const hostnameExpr = `if(
-      length(domain(c.url)) > 0,
-      domain(c.url),
-      extract(c.url, '^(?:https?://)?([^/:]+)')
-    )`
-    
-    const whereClause = `WHERE ${hostnameExpr} ilike {keyword:String} AND c.url IS NOT NULL`
-    return {
-      whereClause,
-      params: { keyword: `%${keyword}%` }
-    }
+    const whereClause = `WHERE ${HOSTNAME_EXPR} LIKE ? AND c.url IS NOT NULL`
+    return { whereClause, params: [`%${keyword}%`] }
   } else {
-    const whereClause = `WHERE c.url ilike {keyword:String} AND c.url IS NOT NULL`
-    return {
-      whereClause,
-      params: { keyword: `%${keyword}%` }
-    }
+    const whereClause = `WHERE c.url LIKE ? AND c.url IS NOT NULL`
+    return { whereClause, params: [`%${keyword}%`] }
   }
 }
 
@@ -70,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     let whereClause = ''
-    let params: Record<string, string> = {}
+    let params: any[] = []
     
     if (searchType === 'keyword') {
       const keyword = targetDomain.trim()
@@ -88,14 +83,6 @@ export async function POST(request: NextRequest) {
 
     console.log("🔍 Overview API called:", { targetDomain, searchType, timelineGranularity, type })
 
-    // ============================================
-    // SPLIT REQUESTS STRATEGY
-    // Support query parameter 'type' for progressive loading:
-    // - type=stats: Return only Subdomains + Paths (fast data ~200ms)
-    // - type=timeline: Return only Timeline (slow data ~2s)
-    // - no type or type=all: Return all (backward compatible)
-    // ============================================
-    
     if (type === 'stats') {
       // Fast data: Subdomains + Paths only
       const [topSubdomains, topPaths] = await Promise.all([
@@ -108,11 +95,6 @@ export async function POST(request: NextRequest) {
           return []
         }),
       ])
-
-      console.log("✅ Stats data retrieved:", {
-        topSubdomainsCount: topSubdomains?.length || 0,
-        topPathsCount: topPaths?.length || 0,
-      })
 
       return NextResponse.json({
         success: true,
@@ -130,11 +112,6 @@ export async function POST(request: NextRequest) {
         return []
       })
 
-      console.log("✅ Timeline data retrieved:", {
-        timelineCount: timelineData?.length || 0,
-        timelineSample: timelineData?.slice(0, 3),
-      })
-
       return NextResponse.json({
         success: true,
         targetDomain,
@@ -143,7 +120,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Default: Return all data (backward compatible)
+    // Default: Return all data
     const [timelineData, topSubdomains, topPaths] = await Promise.all([
       getTimelineData(whereClause, params, timelineGranularity || 'auto').catch((e) => { 
         console.error("❌ Timeline Error:", e)
@@ -158,13 +135,6 @@ export async function POST(request: NextRequest) {
         return []
       }),
     ])
-
-    console.log("✅ Overview data retrieved:", {
-      timelineCount: timelineData?.length || 0,
-      topSubdomainsCount: topSubdomains?.length || 0,
-      topPathsCount: topPaths?.length || 0,
-      timelineSample: timelineData?.slice(0, 3),
-    })
 
     return NextResponse.json({
       success: true,
@@ -181,30 +151,22 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function getTimelineData(whereClause: string, params: Record<string, string>, granularity: string) {
-  // OPTIMIZED DATE PARSING STRATEGY (POST-NORMALIZATION)
-  // After normalization, log_date is already in standard YYYY-MM-DD format
-  // Query becomes very simple and fast - directly toDate() without complex parsing
-  // 
-  // Benefits:
-  // 1. toDate() is very fast for YYYY-MM-DD format (native ClickHouse format)
-  // 2. No need for regex extract or parseDateTimeBestEffort (very expensive)
-  // 3. Query is simpler and easier to maintain
-  const getDateExpr = () => {
-    return `if(
-      si.log_date IS NOT NULL AND si.log_date != '',
-      toDate(si.log_date),  // ← Direct convert, already normalized (YYYY-MM-DD)!
-      toDate(c.created_at)
-    )`
-  }
+async function getTimelineData(whereClause: string, params: any[], granularity: string) {
+  // Use COALESCE logic similar to ClickHouse for date
+  // Assumes log_date is YYYY-MM-DD
+  const dateExpr = `
+    CASE
+      WHEN si.log_date IS NOT NULL AND si.log_date != '' THEN STR_TO_DATE(si.log_date, '%Y-%m-%d')
+      ELSE DATE(c.created_at)
+    END
+  `
 
-  // Check range first for auto granularity
-  const dateExpr = getDateExpr()
-  const dateRangeResult = (await executeClickHouseQuery(
+  // 1. Get Range for Auto Granularity
+  const dateRangeResult = (await executeQuery(
     `SELECT 
-      min(${dateExpr}) as min_date,
-      max(${dateExpr}) as max_date,
-      dateDiff('day', min(${dateExpr}), max(${dateExpr})) as day_range
+      MIN(${dateExpr}) as min_date,
+      MAX(${dateExpr}) as max_date,
+      DATEDIFF(MAX(${dateExpr}), MIN(${dateExpr})) as day_range
     FROM credentials c
     LEFT JOIN devices d ON c.device_id = d.device_id
     LEFT JOIN systeminformation si ON d.device_id = si.device_id
@@ -214,14 +176,12 @@ async function getTimelineData(whereClause: string, params: Record<string, strin
 
   const range = dateRangeResult[0]
   if (!range || !range.min_date) {
-    console.warn("⚠️ No date range found, returning empty timeline")
     return []
   }
 
   let actualGranularity = granularity
   if (granularity === 'auto') {
     const days = Number(range?.day_range) || 0
-    console.log("📅 Day range:", days)
     if (days < 30) {
       actualGranularity = 'daily'
     } else if (days <= 90) {
@@ -229,86 +189,73 @@ async function getTimelineData(whereClause: string, params: Record<string, strin
     } else {
       actualGranularity = 'monthly'
     }
-    console.log("📅 Auto-selected granularity:", actualGranularity)
   }
 
   let query = ''
   if (actualGranularity === 'daily') {
-    query = `SELECT toDate(${dateExpr}) as date, count() as credential_count
+    query = `SELECT DATE(${dateExpr}) as date, COUNT(*) as credential_count
     FROM credentials c
     LEFT JOIN devices d ON c.device_id = d.device_id
     LEFT JOIN systeminformation si ON d.device_id = si.device_id
     ${whereClause} GROUP BY date ORDER BY date ASC`
   } else if (actualGranularity === 'weekly') {
-    query = `SELECT formatDateTime(${dateExpr}, '%Y-%V') as week, min(toDate(${dateExpr})) as date, count() as credential_count
+    query = `SELECT DATE_FORMAT(${dateExpr}, '%Y-%u') as week, MIN(DATE(${dateExpr})) as date, COUNT(*) as credential_count
     FROM credentials c
     LEFT JOIN devices d ON c.device_id = d.device_id
     LEFT JOIN systeminformation si ON d.device_id = si.device_id
     ${whereClause} GROUP BY week ORDER BY date ASC`
   } else {
-    query = `SELECT formatDateTime(${dateExpr}, '%Y-%m') as month, min(toStartOfMonth(${dateExpr})) as date, count() as credential_count
+    // Monthly
+    query = `SELECT DATE_FORMAT(${dateExpr}, '%Y-%m') as month, MIN(DATE(${dateExpr})) as date, COUNT(*) as credential_count
     FROM credentials c
     LEFT JOIN devices d ON c.device_id = d.device_id
     LEFT JOIN systeminformation si ON d.device_id = si.device_id
     ${whereClause} GROUP BY month ORDER BY date ASC`
   }
 
-  console.log("📅 Executing timeline query with granularity:", actualGranularity)
-  const result = (await executeClickHouseQuery(query, params)) as any[]
-
-  console.log("📊 Timeline query result:", result.length, "entries")
+  const result = (await executeQuery(query, params)) as any[]
 
   return result.map((row: any) => ({
-    date: row.date ? String(row.date).split('T')[0] : '',
-      credentialCount: Number(row.credential_count) || 0,
+    date: row.date ? new Date(row.date).toISOString().split('T')[0] : '',
+    credentialCount: Number(row.credential_count) || 0,
   })).filter((i: any) => i.date)
 }
 
 async function getTopSubdomains(
   whereClause: string, 
-  params: Record<string, string>, 
+  params: any[],
   limit: number,
   searchType: string,
   keywordMode: string,
   keyword: string
 ) {
-  // IMPORTANT: Use domain() native function with fallback extract() regex
-  const hostnameExpr = `if(
-    length(domain(c.url)) > 0,
-    domain(c.url),
-    extract(c.url, '^(?:https?://)?([^/:]+)')
-  )`
-  
   let query = ''
-  let queryParams: Record<string, string> = { ...params }
+  let queryParams: any[] = [...params]
   
+  // NOTE: In SingleStore, derived table with WHERE inside might be optimized automatically
   if (searchType === 'keyword' && keywordMode === 'domain-only' && keyword) {
+    // MySQL requires alias for derived tables
     query = `SELECT full_hostname, credential_count FROM (
-        SELECT ${hostnameExpr} as full_hostname, count() as credential_count
+        SELECT ${HOSTNAME_EXPR} as full_hostname, COUNT(*) as credential_count
         FROM credentials c ${whereClause} GROUP BY full_hostname
-      ) WHERE full_hostname ilike {keyword:String} ORDER BY credential_count DESC LIMIT ${Number(limit)}`
-    queryParams.keyword = `%${keyword}%`
+      ) as sub WHERE full_hostname LIKE ? ORDER BY credential_count DESC LIMIT ${Number(limit)}`
+    queryParams.push(`%${keyword}%`)
   } else {
-    query = `SELECT ${hostnameExpr} as full_hostname, count() as credential_count
+    query = `SELECT ${HOSTNAME_EXPR} as full_hostname, COUNT(*) as credential_count
     FROM credentials c ${whereClause} GROUP BY full_hostname ORDER BY credential_count DESC LIMIT ${Number(limit)}`
   }
   
-  const result = (await executeClickHouseQuery(query, queryParams)) as any[]
+  const result = (await executeQuery(query, queryParams)) as any[]
 
-  // IMPORTANT: Cast count() to Number (ClickHouse returns String)
   return result.map((row: any) => ({
     fullHostname: row.full_hostname || '',
     credentialCount: Number(row.credential_count) || 0,
   }))
 }
 
-async function getTopPaths(whereClause: string, params: Record<string, string>, limit: number) {
-  // IMPORTANT: Use path() native function. 
-  // If path() returns empty string (for root), we return '/'
-  const pathExpr = `if(length(path(c.url)) > 0, path(c.url), '/')`
-  
-  const result = (await executeClickHouseQuery(
-    `SELECT ${pathExpr} as path, count() as credential_count
+async function getTopPaths(whereClause: string, params: any[], limit: number) {
+  const result = (await executeQuery(
+    `SELECT ${PATH_EXPR} as path, COUNT(*) as credential_count
     FROM credentials c
     ${whereClause}
     GROUP BY path
@@ -317,7 +264,6 @@ async function getTopPaths(whereClause: string, params: Record<string, string>, 
     params
   )) as any[]
 
-  // IMPORTANT: Cast count() to Number (ClickHouse returns String)
   return result.map((row: any) => ({
     path: row.path || '/',
     credentialCount: Number(row.credential_count) || 0,
