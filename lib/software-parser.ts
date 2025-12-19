@@ -1,4 +1,4 @@
-import { pool } from "./mysql";
+import { pool } from "./db";
 
 interface SoftwareData {
   software_name: string;

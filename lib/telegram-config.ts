@@ -1,4 +1,4 @@
-import { executeQuery } from "./mysql"
+import { executeQuery } from "./db"
 
 export interface TelegramConfig {
   apiId: string

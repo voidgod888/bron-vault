@@ -10,284 +10,327 @@ import { pipeline } from "stream"
 // @ts-ignore
 import mime from "mime-types"
 import JSZip from "jszip"
-
-// Ensure dynamic imports for GramJS to avoid issues in some environments (e.g. Next.js edge, though this is a script)
-// Keeping imports standard here as it's a standalone script.
+import PQueue from "p-queue"
+import os from "os"
+import { createExtractorFromData } from "node-unrar-js"
 
 const streamPipeline = promisify(pipeline)
 
-// Simple state management for incremental scraping
-const STATE_FILE = path.join(process.cwd(), "telegram_scraper_state.json")
-
-interface ScraperState {
-  [sourceId: number]: {
-    lastMessageId: number
-    lastScrapedAt: string
-  }
+interface ScraperSource {
+  id: number
+  name: string
+  identifier: string
+  last_message_id: number
+  last_scraped_at: string
 }
 
-function loadState(): ScraperState {
-  if (fs.existsSync(STATE_FILE)) {
-    try {
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'))
-    } catch (e) {
-      console.error("⚠️ Failed to load state file, starting fresh", e)
+export class TelegramScraper {
+  private client: TelegramClient | null = null
+  private downloadQueue: PQueue
+  private downloadDir: string
+  private isShuttingDown: boolean = false
+
+  constructor() {
+    // Dynamic concurrency based on CPU cores, with a safeguard
+    const cpuCount = os.cpus().length
+    // Minimum 1, max 4 (to avoid flood limits more than CPU limits) or CPU-1
+    const concurrency = Math.max(1, Math.min(4, cpuCount - 1))
+
+    console.log(`🚀 Initializing Telegram Scraper with concurrency: ${concurrency}`)
+
+    this.downloadQueue = new PQueue({ concurrency })
+
+    this.downloadDir = path.join(process.cwd(), "downloads_temp")
+    if (!fs.existsSync(this.downloadDir)) {
+      fs.mkdirSync(this.downloadDir, { recursive: true })
     }
+
+    // Handle graceful shutdown
+    process.on('SIGINT', () => this.shutdown())
+    process.on('SIGTERM', () => this.shutdown())
   }
-  return {}
-}
 
-function saveState(state: ScraperState) {
-  try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2))
-  } catch (e) {
-    console.error("⚠️ Failed to save state file", e)
+  private async shutdown() {
+    console.log("\n⚠️ Shutting down gracefully... waiting for pending tasks.")
+    this.isShuttingDown = true
+    this.downloadQueue.pause()
+    await this.downloadQueue.onIdle()
+    console.log("✅ All tasks completed. Exiting.")
+    process.exit(0)
   }
-}
 
-async function getSources() {
-  // Use SingleStore query
-  return await executeQuery("SELECT * FROM sources WHERE enabled = TRUE AND type = 'telegram'") as any[]
-}
+  async init() {
+    await initializeDatabase()
 
-async function updateLastScraped(id: number) {
-  // Use SingleStore query
-  await executeQuery("UPDATE sources SET last_scraped_at = NOW() WHERE id = ?", [id])
-}
+    const config = await telegramConfig.getConfig()
+    if (!config.apiId || !config.apiHash || !config.session) {
+      console.error("❌ Telegram not configured. Please configure it in the dashboard.")
+      process.exit(1)
+    }
 
-async function downloadMedia(client: TelegramClient, message: any, downloadDir: string): Promise<string | null> {
-  try {
-      if (!message.media) return null
+    this.client = new TelegramClient(new StringSession(config.session), Number(config.apiId), config.apiHash, {
+      connectionRetries: 5,
+    })
 
-      // Check for FloodWait
-      try {
-        const buffer = await client.downloadMedia(message, {
-            workers: 1,
-        } as any)
+    await this.client.connect()
+    console.log("✅ Connected to Telegram")
+  }
 
-        if (!buffer) return null
+  async getSources(): Promise<ScraperSource[]> {
+    return await executeQuery("SELECT * FROM sources WHERE enabled = TRUE AND type = 'telegram'") as any[]
+  }
 
-        let fileName = "unknown"
-        // Try to get filename from attributes
-        if (message.media.document && message.media.document.attributes) {
-            for (const attr of message.media.document.attributes) {
-                if (attr.className === "DocumentAttributeFilename") {
-                    fileName = attr.fileName
-                    break
-                }
-            }
-        }
+  async updateLastMessageId(sourceId: number, messageId: number) {
+    await executeQuery("UPDATE sources SET last_message_id = ?, last_scraped_at = NOW() WHERE id = ?", [messageId, sourceId])
+  }
 
-        // If no filename, generate one based on mime type or date
-        if (fileName === "unknown") {
-            const ext = mime.extension(message.media.document?.mimeType) || "bin"
-            fileName = `file_${message.id}.${ext}`
-        }
+  async processRarFile(filePath: string): Promise<string | null> {
+    try {
+      console.log(`      📦 Converting RAR to ZIP: ${path.basename(filePath)}`)
+      const fileBuffer = await fs.promises.readFile(filePath)
 
-        const filePath = path.join(downloadDir, fileName)
-        await fs.promises.writeFile(filePath, buffer)
-        return filePath
-      } catch (error: any) {
-        if (error.errorMessage === 'FLOOD') {
-           console.log(`⏳ FloodWait: waiting for ${error.seconds} seconds...`)
-           await new Promise(resolve => setTimeout(resolve, error.seconds * 1000))
-           // Retry once recursively
-           return downloadMedia(client, message, downloadDir)
-        }
-        throw error
+      // Open RAR using node-unrar-js
+      const extractor = await createExtractorFromData({ data: fileBuffer })
+      const list = extractor.getFileList()
+      const files = [...list.fileHeaders] // Consume iterator
+
+      if (files.length === 0) {
+        console.warn(`      ⚠️ Empty RAR file: ${path.basename(filePath)}`)
+        return null
       }
 
-  } catch (error) {
+      const zip = new JSZip()
+      const extracted = extractor.extract()
+      for (const file of extracted.files) {
+         if (file.fileHeader.flags.directory) continue; // Skip directories
+         // Add to zip
+         // file.extraction is Uint8Array
+         if(file.extraction) {
+             zip.file(file.fileHeader.name, file.extraction)
+         }
+      }
+
+      const zipPath = filePath + ".zip"
+      const zipContent = await zip.generateAsync({ type: "nodebuffer" })
+      await fs.promises.writeFile(zipPath, zipContent)
+
+      // Cleanup original RAR
+      await fs.promises.unlink(filePath)
+
+      return zipPath
+    } catch (error) {
+      console.error(`      ❌ Failed to convert RAR ${path.basename(filePath)}:`, error)
+      return null
+    }
+  }
+
+  async processTextFile(filePath: string): Promise<string | null> {
+    try {
+      console.log(`      📦 Converting Text to ZIP: ${path.basename(filePath)}`)
+      const zip = new JSZip()
+      const content = await fs.promises.readFile(filePath)
+      const fileName = path.basename(filePath)
+      zip.file(fileName, content)
+
+      const zipPath = filePath + ".zip"
+      const zipContent = await zip.generateAsync({ type: "nodebuffer" })
+      await fs.promises.writeFile(zipPath, zipContent)
+
+      // Delete original text file
+      await fs.promises.unlink(filePath)
+
+      return zipPath
+    } catch (error) {
+      console.error(`      ❌ Failed to zip text file ${filePath}:`, error)
+      return null
+    }
+  }
+
+  async downloadMedia(message: any): Promise<string | null> {
+    if (!this.client) return null
+    if (!message.media) return null
+
+    try {
+      // Check for FloodWait inside download logic or retry wrapper?
+      // GramJS usually handles it, but let's be safe.
+
+      const buffer = await this.client.downloadMedia(message, {
+          workers: 1,
+      } as any)
+
+      if (!buffer) return null
+
+      let fileName = "unknown"
+      // Try to get filename from attributes
+      if (message.media.document && message.media.document.attributes) {
+          for (const attr of message.media.document.attributes) {
+              if (attr.className === "DocumentAttributeFilename") {
+                  fileName = attr.fileName
+                  break
+              }
+          }
+      }
+
+      // If no filename, generate one
+      if (fileName === "unknown") {
+          const ext = mime.extension(message.media.document?.mimeType) || "bin"
+          fileName = `file_${message.id}.${ext}`
+      }
+
+      const filePath = path.join(this.downloadDir, fileName)
+      await fs.promises.writeFile(filePath, buffer)
+      return filePath
+
+    } catch (error: any) {
+      if (error.errorMessage === 'FLOOD') {
+         console.log(`⏳ FloodWait: waiting for ${error.seconds} seconds...`)
+         await new Promise(resolve => setTimeout(resolve, error.seconds * 1000))
+         return this.downloadMedia(message)
+      }
       console.error(`Failed to download media for message ${message.id}:`, error)
       return null
+    }
   }
-}
 
-// Wrap text file in a zip
-async function zipTextFile(filePath: string): Promise<string | null> {
-  try {
-    const zip = new JSZip()
-    const content = await fs.promises.readFile(filePath)
-    const fileName = path.basename(filePath)
-    zip.file(fileName, content)
+  async processSource(source: ScraperSource) {
+    if (this.isShuttingDown || !this.client) return
 
-    const zipPath = filePath + ".zip"
-    const zipContent = await zip.generateAsync({ type: "nodebuffer" })
-    await fs.promises.writeFile(zipPath, zipContent)
-
-    // Delete original text file
-    await fs.promises.unlink(filePath)
-
-    return zipPath
-  } catch (error) {
-    console.error(`Failed to zip text file ${filePath}:`, error)
-    return null
-  }
-}
-
-async function processSource(client: TelegramClient, source: any, state: ScraperState, downloadDir: string) {
     console.log(`\n🔍 Scraping source: ${source.name} (${source.identifier})`)
 
     try {
-        // Resolve entity (channel/user)
         let entity;
         try {
-           entity = await client.getEntity(source.identifier)
+           entity = await this.client.getEntity(source.identifier)
         } catch (e) {
            console.error(`❌ Failed to resolve entity ${source.identifier}:`, e)
            return
         }
 
-        const sourceState = state[source.id] || { lastMessageId: 0, lastScrapedAt: '' }
-        const lastMessageId = sourceState.lastMessageId
-
+        const lastMessageId = Number(source.last_message_id || 0)
         console.log(`   Last message ID: ${lastMessageId}`)
 
-        // Fetch messages
-        // If we have a lastMessageId, we try to fetch messages since then.
-        // Limit to 50 to avoid huge fetches
         const options: any = { limit: 20 }
         if (lastMessageId > 0) {
              options.minId = lastMessageId
-             // If we are incremental, we might want to fetch more to catch up, but let's stick to batches
-             // to avoid overloading.
-             options.limit = 50
+             options.limit = 50 // Slightly higher for incremental catch-up
         }
 
-        const messages = await client.getMessages(entity, options)
+        const messages = await this.client.getMessages(entity, options)
         console.log(`   Found ${messages.length} new messages`)
 
         let maxId = lastMessageId
-        let processedCount = 0
 
-        // Reverse to process oldest first (so we update maxId correctly as we go)
-        for (const message of messages.reverse()) {
+        // Process messages oldest to newest
+        const sortedMessages = messages.reverse()
+
+        for (const message of sortedMessages) {
+            if (this.isShuttingDown) break
+
             if (message.id > maxId) maxId = message.id
 
-            // Check if message has file
             const media = message.media as any;
             if (media && media.document) {
                 const mimeType = media.document.mimeType
-                const isZip = mimeType === "application/zip" || mimeType === "application/x-zip-compressed"
-                const isTxt = mimeType === "text/plain"
-
-                if (isZip || isTxt) {
-                    console.log(`   ⬇️ [${source.name}] Downloading message ${message.id}...`)
-                    let filePath = await downloadMedia(client, message, downloadDir)
-
-                    if (filePath) {
-                        // Handle Text Files by zipping them
-                        if (isTxt || !filePath.toLowerCase().endsWith(".zip")) {
-                             console.log(`      Converting text file to ZIP...`)
-                             const zippedPath = await zipTextFile(filePath)
-                             if (zippedPath) {
-                               filePath = zippedPath
-                             } else {
-                               console.error(`      Failed to zip file, skipping.`)
-                               // Cleanup
-                               try { await fs.promises.unlink(filePath) } catch {}
-                               continue
-                             }
-                        }
-
-                        console.log(`   📦 Processing ${path.basename(filePath)}...`)
-
-                        // Define a logger for the processor
-                        const logger = (msg: string, type: any) => console.log(`      [Processor] ${type?.toUpperCase() || 'INFO'}: ${msg}`)
-
-                        try {
-                             await processFileUploadFromPath(
-                                filePath,
-                                path.basename(filePath),
-                                "telegram_scraper",
-                                logger,
-                                true, // Delete after processing
-                                source.id // Pass source ID
-                            )
-                            processedCount++
-                        } catch (e) {
-                            console.error(`      ❌ Processing failed:`, e)
+                // We trust extension check more often for rar/zip because mime types vary
+                let fileName = "unknown"
+                if (media.document.attributes) {
+                    for (const attr of media.document.attributes) {
+                        if (attr.className === "DocumentAttributeFilename") {
+                            fileName = attr.fileName
+                            break
                         }
                     }
+                }
+
+                const lowerName = fileName.toLowerCase()
+                const isZip = mimeType === "application/zip" || mimeType === "application/x-zip-compressed" || lowerName.endsWith(".zip")
+                const isRar = mimeType === "application/x-rar-compressed" || lowerName.endsWith(".rar")
+                const isTxt = mimeType === "text/plain" || lowerName.endsWith(".txt")
+
+                if (isZip || isRar || isTxt) {
+                    // Queue download task
+                    const task = this.downloadQueue.add(async () => {
+                        console.log(`   ⬇️ [${source.name}] Downloading message ${message.id} (${fileName})...`)
+                        let filePath = await this.downloadMedia(message)
+
+                        if (filePath) {
+                            // Conversion logic
+                            if (isTxt) {
+                                filePath = await this.processTextFile(filePath)
+                            } else if (isRar) {
+                                filePath = await this.processRarFile(filePath)
+                            }
+
+                            if (filePath && filePath.endsWith(".zip")) {
+                                console.log(`   📦 Processing ${path.basename(filePath)}...`)
+                                const logger = (msg: string, type: any) => console.log(`      [Processor] ${type?.toUpperCase() || 'INFO'}: ${msg}`)
+
+                                try {
+                                    await processFileUploadFromPath(
+                                        filePath,
+                                        path.basename(filePath),
+                                        "telegram_scraper",
+                                        logger,
+                                        true, // Delete after processing
+                                        source.id
+                                    )
+                                } catch (e) {
+                                    console.error(`      ❌ Processing failed:`, e)
+                                }
+                            } else {
+                                // Cleanup if conversion failed
+                                if (filePath) try { await fs.promises.unlink(filePath) } catch {}
+                            }
+                        }
+                    })
+                    // No await here, let queue handle it
                 }
             }
         }
 
-        // Update state
-        if (maxId > lastMessageId) {
-            state[source.id] = {
-                lastMessageId: maxId,
-                lastScrapedAt: new Date().toISOString()
-            }
-            saveState(state)
-        }
+        // Wait for all tasks in this batch (source) to complete before updating state
+        await this.downloadQueue.onIdle()
 
-        await updateLastScraped(source.id)
-        console.log(`   ✅ Processed ${processedCount} files. New last ID: ${maxId}`)
+        // Update state in DB
+        if (maxId > lastMessageId) {
+            await this.updateLastMessageId(source.id, maxId)
+            console.log(`   ✅ Source ${source.name} updated to ID ${maxId}`)
+        }
 
     } catch (error: any) {
         if (error.errorMessage === 'FLOOD') {
            console.log(`⏳ FloodWait on source ${source.name}: waiting for ${error.seconds} seconds...`)
-           // We don't wait here to block everything, we just skip this source for now
         } else {
            console.error(`❌ Error scraping ${source.name}:`, error)
         }
     }
-}
-
-async function main() {
-  const args = process.argv.slice(2)
-  const daemonMode = args.includes('--daemon')
-
-  console.log("🚀 Starting Telegram Scraper" + (daemonMode ? " (Daemon Mode)" : "") + "...")
-
-  // 1. Initialize DB
-  await initializeDatabase()
-
-  // 2. Load Config
-  const config = await telegramConfig.getConfig()
-  if (!config.apiId || !config.apiHash || !config.session) {
-    console.error("❌ Telegram not configured. Please configure it in the dashboard.")
-    process.exit(1)
   }
 
-  // 3. Connect to Telegram
-  const client = new TelegramClient(new StringSession(config.session), Number(config.apiId), config.apiHash, {
-    connectionRetries: 5,
-  })
+  async run() {
+    const args = process.argv.slice(2)
+    const daemonMode = args.includes('--daemon')
 
-  await client.connect()
-  console.log("✅ Connected to Telegram")
+    await this.init()
 
-  // Ensure download directory exists
-  const downloadDir = path.join(process.cwd(), "downloads_temp")
-  if (!fs.existsSync(downloadDir)) {
-      fs.mkdirSync(downloadDir, { recursive: true })
-  }
-
-  // Run Loop
-  while (true) {
-      // 4. Get Sources
-      const sources = await getSources()
+    while (!this.isShuttingDown) {
+      const sources = await this.getSources()
       console.log(`📋 Found ${sources.length} active sources`)
 
-      // Load State
-      const state = loadState()
+      // Process sources sequentially (or with limited concurrency if desired, but we have internal queue)
+      // Since we want to respect rate limits, processing sources one by one but downloading in parallel (via queue) is safer.
+      // Or we can process sources in parallel.
+      // Let's stick to batching sources to avoid hitting "GetMessages" limits too fast.
 
-      // 5. Process Sources with Concurrency
-      // We'll process in batches of 3 to allow some concurrency but prevent flood
-      const BATCH_SIZE = 3
-      for (let i = 0; i < sources.length; i += BATCH_SIZE) {
-          const batch = sources.slice(i, i + BATCH_SIZE)
-          console.log(`\n🔄 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(sources.length/BATCH_SIZE)}`)
+      for (const source of sources) {
+          if (this.isShuttingDown) break
+          await this.processSource(source)
 
-          await Promise.all(batch.map((source: any) => processSource(client, source, state, downloadDir)))
-
-          // Small pause between batches to be nice to Telegram API
-          if (i + BATCH_SIZE < sources.length) {
-              await new Promise(resolve => setTimeout(resolve, 2000))
-          }
+          // Wait a bit between sources
+          await new Promise(resolve => setTimeout(resolve, 2000))
       }
+
+      // Wait for queue to drain before finishing cycle (optional, but good for cleanliness)
+      await this.downloadQueue.onIdle()
 
       console.log("\n✅ Scraping cycle complete.")
 
@@ -295,13 +338,13 @@ async function main() {
           break
       }
 
-      // Wait for next cycle (e.g., 5 minutes)
       const waitTime = 5 * 60 * 1000 // 5 minutes
       console.log(`💤 Sleeping for ${waitTime / 1000}s...`)
       await new Promise(resolve => setTimeout(resolve, waitTime))
-  }
+    }
 
-  process.exit(0)
+    await this.shutdown()
+  }
 }
 
-main().catch(console.error)
+new TelegramScraper().run().catch(console.error)
