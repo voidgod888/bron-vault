@@ -223,7 +223,7 @@ export async function processZipStream(
   logWithBroadcast: (message: string, type?: "info" | "success" | "warning" | "error") => void,
   sourceId: number | null = null,
 ): Promise<ProcessingResult> {
-  let zipfile2: yauzl.ZipFile | null = null
+  let zipfile: yauzl.ZipFile | null = null
   try {
     const { stat } = await import("fs/promises")
     const stats = await stat(filePath)
@@ -242,13 +242,16 @@ export async function processZipStream(
     }
 
     // PASS 1: Read all entry metadata to analyze structure
-    logWithBroadcast("📦 PASS 1: Reading ZIP metadata for structure analysis...", "info")
-    const zipfile = await yauzlOpen(filePath, { lazyEntries: true })
+    // IMPORTANT: Set autoClose: false so we can reuse the zipfile instance for content reading
+    logWithBroadcast("📦 Reading ZIP metadata for structure analysis...", "info")
+    zipfile = await yauzlOpen(filePath, { lazyEntries: true, autoClose: false })
 
     const allPaths: string[] = []
     const entryMap = new Map<string, yauzl.Entry>()
 
     await new Promise<void>((resolve, reject) => {
+      if (!zipfile) return reject(new Error("Zipfile not initialized"))
+
       zipfile.readEntry()
       zipfile.on("entry", (entry: yauzl.Entry) => {
         // Normalize path (remove leading slash, handle Windows paths)
@@ -260,11 +263,10 @@ export async function processZipStream(
           entryMap.set(normalizedPath, entry)
         }
         
-        zipfile.readEntry()
+        zipfile!.readEntry()
       })
       zipfile.on("end", () => {
-        logWithBroadcast(`✅ PASS 1 complete: Found ${allPaths.length} files`, "success")
-        // DON'T close zipfile here - we need it for PASS 2
+        logWithBroadcast(`✅ Metadata read complete: Found ${allPaths.length} files`, "success")
         resolve()
       })
       zipfile.on("error", reject)
@@ -340,48 +342,9 @@ export async function processZipStream(
       existingDeviceHashes = new Set(existingDevices.map((d) => d.device_name_hash))
     }
 
-    // PASS 2: Process each device
-    logWithBroadcast(`🔄 PASS 2: Processing ${deviceMap.size} devices...`, "info")
+    // Process each device using the already open zipfile
+    logWithBroadcast(`🔄 Processing ${deviceMap.size} devices...`, "info")
     
-    // Reopen ZIP file for reading content (zipfile from PASS 1 is closed after "end" event)
-    // We need a new zipfile instance to read entry contents
-    // IMPORTANT: Set autoClose: false to prevent automatic file close after "end" event
-    // We need to keep the file open to read entry contents later
-    zipfile2 = await yauzlOpen(filePath, { lazyEntries: true, autoClose: false })
-    const entryMap2 = new Map<string, yauzl.Entry>()
-
-    // Build entry map for PASS 2 (we need fresh entries from the new zipfile)
-    if (!zipfile2) {
-      throw new Error("Failed to open ZIP file for PASS 2")
-    }
-    
-    await new Promise<void>((resolve, reject) => {
-      zipfile2!.readEntry()
-      zipfile2!.on("entry", (entry: yauzl.Entry) => {
-        const normalizedPath = entry.fileName.replace(/\\/g, "/").replace(/^\/+/, "")
-        if (!entry.fileName.endsWith("/")) {
-          entryMap2.set(normalizedPath, entry)
-        }
-        zipfile2!.readEntry()
-      })
-      zipfile2!.on("end", () => {
-        logWithBroadcast(`✅ PASS 2 entry map ready: ${entryMap2.size} entries`, "success")
-        resolve()
-      })
-      zipfile2!.on("error", reject)
-    })
-    
-    // Now update deviceMap to use entries from zipfile2
-    for (const [deviceName, deviceFiles] of deviceMap) {
-      for (let i = 0; i < deviceFiles.length; i++) {
-        const filePath = deviceFiles[i].path
-        const newEntry = entryMap2.get(filePath)
-        if (newEntry) {
-          deviceFiles[i].entry = newEntry
-        }
-      }
-    }
-
     let devicesSkipped = 0
     let devicesProcessed = 0
     let totalFiles = 0
@@ -413,15 +376,15 @@ export async function processZipStream(
       const deviceId = `device_${uploadBatch}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
       // Convert yauzl entries to wrapper format for device-processor
-      // Use zipfile2 from PASS 2 - entries are still valid and zipfile is still open
-      if (!zipfile2) {
+      // Using the SAME zipfile instance which is kept open
+      if (!zipfile) {
         throw new Error("ZIP file is not open for reading entry contents")
       }
       
       const zipFiles = deviceFiles.map(({ path: filePath, entry }) => {
         return {
           path: filePath,
-          entry: new YauzlEntryWrapper(filePath, entry, zipfile2!),
+          entry: new YauzlEntryWrapper(filePath, entry, zipfile!),
         }
       })
 
@@ -467,10 +430,10 @@ export async function processZipStream(
     // This ensures users see new data immediately, not cached old data
     await executeQuery("DELETE FROM analytics_cache WHERE cache_key IN ('stats_main', 'browser_analysis', 'software_analysis', 'top_tlds')")
 
-    // Close zipfile2 to free resources
+    // Close zipfile to free resources
     try {
-      if (zipfile2) {
-        zipfile2.close()
+      if (zipfile) {
+        zipfile.close()
       }
     } catch (closeError) {
       // Ignore close errors
@@ -499,11 +462,10 @@ export async function processZipStream(
       logWithBroadcast(`📋 Error stack: ${errorStack}`, "error")
     }
 
-    // Cleanup zipfile2 if it exists
+    // Cleanup zipfile if it exists
     try {
-      // zipfile2 might not be defined if error occurred before PASS 2
-      if (typeof zipfile2 !== 'undefined' && zipfile2) {
-        zipfile2.close()
+      if (zipfile) {
+        zipfile.close()
       }
     } catch (closeError) {
       // Ignore close errors
@@ -512,4 +474,3 @@ export async function processZipStream(
     throw new Error(`Failed to process zip file: ${errorMessage}`)
   }
 }
-
