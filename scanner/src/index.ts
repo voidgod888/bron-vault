@@ -1,10 +1,10 @@
-const Redis = require('ioredis');
-const mysql = require('mysql2/promise');
-const axios = require('axios');
-const net = require('net');
-const dns = require('dns').promises;
-const sslChecker = require('ssl-checker');
-const winston = require('winston');
+import Redis from 'ioredis';
+import mysql, { PoolOptions } from 'mysql2/promise';
+import axios from 'axios';
+import net from 'net';
+import { promises as dns } from 'dns';
+import sslChecker from 'ssl-checker';
+import winston from 'winston';
 
 // Logger setup
 const logger = winston.createLogger({
@@ -20,16 +20,15 @@ const logger = winston.createLogger({
 
 // Environment variables
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
-const REDIS_PORT = process.env.REDIS_PORT || 6379;
+const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
 
 // SingleStore (MySQL compatible) configuration
-const MYSQL_CONFIG = {
+const MYSQL_CONFIG: PoolOptions = {
   host: process.env.MYSQL_HOST || 'localhost',
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD,
   database: process.env.MYSQL_DATABASE,
-  port: process.env.MYSQL_PORT || 3306,
-  // Add flags for SingleStore compatibility if needed, though standard mysql2 works fine usually
+  port: parseInt(process.env.MYSQL_PORT || '3306', 10),
   flags: ['-FOUND_ROWS']
 };
 
@@ -48,7 +47,7 @@ const redis = new Redis({
 // MySQL connection pool
 const pool = mysql.createPool(MYSQL_CONFIG);
 
-async function scanPort(host, port) {
+async function scanPort(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(2000); // 2s timeout
@@ -72,7 +71,14 @@ async function scanPort(host, port) {
   });
 }
 
-async function getWebData(domain) {
+interface WebData {
+  status?: number | null;
+  title?: string | null;
+  server?: string | null;
+  error?: string;
+}
+
+async function getWebData(domain: string): Promise<WebData> {
   try {
     const response = await axios.get(`http://${domain}`, {
       timeout: 5000,
@@ -87,19 +93,25 @@ async function getWebData(domain) {
     return {
       status: response.status,
       title: title ? title.substring(0, 255) : null, // Truncate
-      server: response.headers['server'] ? response.headers['server'].substring(0, 255) : null
+      server: response.headers['server'] ? (response.headers['server'] as string).substring(0, 255) : null
     };
-  } catch (error) {
+  } catch (error: any) {
     return { error: error.message };
   }
 }
 
-async function getSslData(domain) {
+interface SslData {
+  valid: boolean;
+  issuer: string | null;
+  expiry: Date;
+}
+
+async function getSslData(domain: string): Promise<SslData | null> {
   try {
-    const sslData = await sslChecker(domain, { method: "GET", port: 443 });
+    const sslData = await sslChecker(domain, { method: "GET", port: 443 }) as any;
     return {
       valid: sslData.valid,
-      issuer: sslData.issuer ? sslData.issuer.O || sslData.issuer.CN : null,
+      issuer: sslData.issuer ? (sslData.issuer.O || sslData.issuer.CN || null) : null,
       expiry: new Date(sslData.validTo)
     };
   } catch (error) {
@@ -107,15 +119,15 @@ async function getSslData(domain) {
   }
 }
 
-async function processDomain(domain, priority) {
+async function processDomain(domain: string, priority: string) {
   logger.info(`Starting scan for ${domain} (Priority: ${priority})`);
 
   // 1. Resolve DNS
-  let ip = null;
+  let ip: string | null = null;
   try {
     const addresses = await dns.resolve4(domain);
     ip = addresses[0];
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`DNS Resolution failed for ${domain}: ${error.message}`);
     // Update status to failed
     await pool.execute(
@@ -126,26 +138,27 @@ async function processDomain(domain, priority) {
   }
 
   // 2. Scan Ports
-  const openPorts = [];
+  const openPorts: number[] = [];
   for (const port of PORTS_TO_SCAN) {
-    const isOpen = await scanPort(ip, port);
-    if (isOpen) openPorts.push(port);
+    if (ip) {
+        const isOpen = await scanPort(ip, port);
+        if (isOpen) openPorts.push(port);
+    }
   }
 
   // 3. Web Data (if 80 or 443 open)
-  let webData = {};
+  let webData: WebData = {};
   if (openPorts.includes(80) || openPorts.includes(443)) {
     webData = await getWebData(domain);
   }
 
   // 4. SSL Data (if 443 open)
-  let sslData = null;
+  let sslData: SslData | null = null;
   if (openPorts.includes(443)) {
     sslData = await getSslData(domain);
   }
 
   // 5. Save Results
-  // SingleStore handles ON DUPLICATE KEY UPDATE mostly compatible with MySQL
   try {
     await pool.execute(
       `INSERT INTO scanned_hosts
@@ -176,7 +189,7 @@ async function processDomain(domain, priority) {
       ]
     );
     logger.info(`Scan completed for ${domain}`);
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Database save failed for ${domain}: ${error.message}`);
   }
 }
@@ -195,7 +208,7 @@ async function main() {
         const data = JSON.parse(result[1]);
         await processDomain(data.domain, data.priority || 'low');
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`Worker Loop Error: ${error.message}`);
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait before retrying
     }

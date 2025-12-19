@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  app:
+    image: bronvault-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_HOST=singlestore
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_PORT=3306
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - NEXT_PUBLIC_ENABLE_AUTH=${NEXT_PUBLIC_ENABLE_AUTH:-true}
+      - NODE_ENV=production
+    depends_on:
+      - singlestore
+    # Run migrations before starting the app
+    command: sh -c "npm run migrate && npm start"
+
+  scanner:
+    image: bronvault-scanner:latest
+    build:
+      context: ./scanner
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - MYSQL_HOST=singlestore
+      - MYSQL_USER=${DATABASE_USER}
+      - MYSQL_PASSWORD=${DATABASE_PASSWORD}
+      - MYSQL_DATABASE=${DATABASE_NAME}
+      - MYSQL_PORT=3306
+    depends_on:
+      - singlestore
+
+  singlestore:
+    image: ghcr.io/singlestore-labs/singlestoredb-dev:latest
+    restart: always
+    ports:
+      - "3306:3306"
+      - "8080:8080"
+    environment:
+      - ROOT_PASSWORD=${DATABASE_PASSWORD}
+      - HTTP_API=on
+    volumes:
+      - singlestore_data:/var/lib/memsql
+
+volumes:
+  singlestore_data:
