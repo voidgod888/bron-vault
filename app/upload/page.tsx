@@ -521,7 +521,19 @@ export default function UploadPage() {
                       <Upload className="h-4 w-4 animate-pulse text-primary" />
                       <span className="text-foreground">Processing data...</span>
                     </div>
-                    <div className="text-sm font-medium text-primary">{uploadStatus.progress}%</div>
+                    <div className="flex items-center space-x-3">
+                      <div className="text-sm font-medium text-primary">{uploadStatus.progress}%</div>
+                      <Button
+                        onClick={resetUpload}
+                        variant="outline"
+                        size="sm"
+                        className="bg-primary/10 border-destructive/30 text-destructive hover:bg-primary/20"
+                        title="Reset view if stuck (process may continue in background)"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Stop / Reset
+                      </Button>
+                    </div>
                   </div>
                   <Progress value={uploadStatus.progress} className="w-full" />
                   {/* Realtime Logs Window */}
