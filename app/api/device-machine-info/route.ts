@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { validateRequest } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Device ID is required" }, { status: 400 })
     }
 
-    // Get all system information from systeminformation table (ClickHouse)
-    const systemInfo = (await executeClickHouseQuery(
+    // Get all system information from systeminformation table (SingleStore)
+    const systemInfo = (await executeQuery(
       `
       SELECT 
         device_id,
@@ -37,10 +37,10 @@ export async function POST(request: NextRequest) {
         source_file,
         created_at
       FROM systeminformation
-      WHERE device_id = {deviceId:String}
+      WHERE device_id = ?
       LIMIT 1
     `,
-      { deviceId },
+      [deviceId],
     )) as any[]
 
     if (systemInfo.length === 0) {
@@ -78,4 +78,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { logInfo, logError } from "@/lib/logger"
 import { deviceCredentialsSchema, validateData, createValidationErrorResponse } from "@/lib/validation"
 import { validateRequest } from "@/lib/auth"
@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
     const { deviceId } = validation.data
     logInfo(`Loading software for device: ${deviceId}`, undefined, 'Device Software API')
 
-    // First, verify the device exists (ClickHouse)
-    const deviceCheck = (await executeClickHouseQuery(
-      "SELECT device_id, device_name FROM devices WHERE device_id = {deviceId:String}",
-      { deviceId },
+    // First, verify the device exists (SingleStore)
+    const deviceCheck = (await executeQuery(
+      "SELECT device_id, device_name FROM devices WHERE device_id = ?",
+      [deviceId],
     )) as any[]
 
     console.log("📱 Device check result:", deviceCheck)
@@ -37,22 +37,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Device not found" }, { status: 404 })
     }
 
-    // Get software installed for this device (ClickHouse)
-    const software = (await executeClickHouseQuery(
+    // Get software installed for this device (SingleStore)
+    const software = (await executeQuery(
       `SELECT 
-        coalesce(software_name, 'Unknown') as software_name,
-        coalesce(version, '') as version,
-        coalesce(source_file, '') as source_file
+        COALESCE(software_name, 'Unknown') as software_name,
+        COALESCE(version, '') as version,
+        COALESCE(source_file, '') as source_file
        FROM software 
-       WHERE device_id = {deviceId:String} 
+       WHERE device_id = ?
        ORDER BY software_name, version`,
-      { deviceId },
+      [deviceId],
     )) as any[]
 
     console.log(`📊 Found ${software.length} software entries for device ${deviceId}`)
 
     // Format software for display
-    const formattedSoftware = software.map((sw) => ({
+    const formattedSoftware = software.map((sw: any) => ({
       software_name: sw.software_name || "Unknown",
       version: sw.version || "",
       source_file: sw.source_file || "",
@@ -72,4 +72,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

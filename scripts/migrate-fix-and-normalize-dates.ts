@@ -63,7 +63,7 @@ async function loadEnv() {
  * Step 1: Fix invalid log_date values (2000-01-01) with created_at date
  */
 async function fixInvalidLogDates() {
-  const { executeQuery } = await import('../lib/mysql');
+  const { executeQuery } = await import('../lib/db');
   console.log('🚀 Step 1: Fixing invalid log_date values (2000-01-01)...\n');
 
   const DRY_RUN = process.env.DRY_RUN === 'true';
@@ -186,7 +186,7 @@ async function fixInvalidLogDates() {
  * Step 2: Normalize all log_date values to YYYY-MM-DD format
  */
 async function normalizeAllDates() {
-  const { executeQuery } = await import('../lib/mysql');
+  const { executeQuery } = await import('../lib/db');
   const { normalizeDateTime } = await import('../lib/system-information-parser/date-normalizer');
   console.log('🚀 Step 2: Normalizing all log_date values...\n');
 

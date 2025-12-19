@@ -1,42 +1,50 @@
 import { NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { validateRequest } from "@/lib/auth"
 
-function buildDomainWhereClause(targetDomain: string): { whereClause: string; params: Record<string, string> } {
+// ============================================
+// SINGLESTORE EXPRESSIONS (CONSTANTS)
+// ============================================
+const HOSTNAME_EXPR = `
+  SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(url, '/', 3), '://', -1), '/', 1), ':', 1)
+`
+
+const PATH_EXPR = `
+  CASE
+    WHEN url LIKE '%/%' THEN CONCAT('/', SUBSTRING_INDEX(url, '/', -1))
+    ELSE '/'
+  END
+`
+
+function buildDomainWhereClause(targetDomain: string): { whereClause: string; params: any[] } {
   const whereClause = `WHERE (
-    domain = {domain:String} OR 
-    domain ilike concat('%.', {domain:String}) OR
-    url ilike {pattern1:String} OR
-    url ilike {pattern2:String} OR
-    url ilike {pattern3:String} OR
-    url ilike {pattern4:String}
+    domain = ? OR
+    domain LIKE ? OR
+    url LIKE ? OR
+    url LIKE ? OR
+    url LIKE ? OR
+    url LIKE ?
   )`
     return {
       whereClause,
-    params: {
-      domain: targetDomain,
-      pattern1: `%://${targetDomain}/%`,
-      pattern2: `%://${targetDomain}:%`,
-      pattern3: `%://%.${targetDomain}/%`,
-      pattern4: `%://%.${targetDomain}:%`
-    }
+    params: [
+      targetDomain,
+      `%.${targetDomain}`,
+      `%://${targetDomain}/%`,
+      `%://${targetDomain}:%`,
+      `%://%.${targetDomain}/%`,
+      `%://%.${targetDomain}:%`
+    ]
   }
 }
 
-function buildKeywordWhereClause(keyword: string, mode: 'domain-only' | 'full-url' = 'full-url'): { whereClause: string; params: Record<string, string> } {
+function buildKeywordWhereClause(keyword: string, mode: 'domain-only' | 'full-url' = 'full-url'): { whereClause: string; params: any[] } {
   if (mode === 'domain-only') {
-    // Use safe extract/domain without array access
-    // IMPORTANT: Use domain() native function with fallback extract() regex
-    const hostnameExpr = `if(
-      length(domain(url)) > 0,
-      domain(url),
-      extract(url, '^(?:https?://)?([^/:]+)')
-    )`
-    const whereClause = `WHERE ${hostnameExpr} ilike {keyword:String} AND url IS NOT NULL`
-    return { whereClause, params: { keyword: `%${keyword}%` } }
+    const whereClause = `WHERE ${HOSTNAME_EXPR} LIKE ? AND url IS NOT NULL`
+    return { whereClause, params: [`%${keyword}%`] }
   } else {
-    const whereClause = `WHERE url ilike {keyword:String} AND url IS NOT NULL`
-    return { whereClause, params: { keyword: `%${keyword}%` } }
+    const whereClause = `WHERE url LIKE ? AND url IS NOT NULL`
+    return { whereClause, params: [`%${keyword}%`] }
   }
 }
 
@@ -55,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     let whereClause = ''
-    let params: Record<string, string> = {}
+    let params: any[] = []
     
     if (searchType === 'keyword') {
       const keyword = targetDomain.trim()
@@ -85,31 +93,19 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function getSummaryStats(whereClause: string, params: Record<string, unknown>) {
-  // 1. Total Subdomains: Use native domain() with fallback extract() regex
-  // IMPORTANT: Avoid array access, use native ClickHouse functions
-  const hostnameExpr = `if(
-    length(domain(url)) > 0,
-    domain(url),
-    extract(url, '^(?:https?://)?([^/:]+)')
-  )`
-  
-  // 2. Total Paths: Use native path()
-  // IMPORTANT: path() returns empty string for root, so we return '/'
-  const pathExpr = `if(length(path(url)) > 0, path(url), '/')`
-
+async function getSummaryStats(whereClause: string, params: any[]) {
   // Execute all counts in parallel
+  // NOTE: Reuse params for each query is fine as they don't mutate
   const [subRes, pathRes, credRes, reusedRes, devRes] = await Promise.all([
-    executeClickHouseQuery(`SELECT uniq(${hostnameExpr}) as total FROM credentials ${whereClause}`, params),
-    executeClickHouseQuery(`SELECT uniq(${pathExpr}) as total FROM credentials ${whereClause}`, params),
-    executeClickHouseQuery(`SELECT count() as total FROM credentials ${whereClause}`, params),
-    executeClickHouseQuery(`SELECT count() as total FROM (
-      SELECT username, password, url FROM credentials ${whereClause} GROUP BY username, password, url HAVING count() > 1
-    )`, params),
-    executeClickHouseQuery(`SELECT uniq(device_id) as total FROM credentials ${whereClause}`, params)
+    executeQuery(`SELECT COUNT(DISTINCT ${HOSTNAME_EXPR}) as total FROM credentials ${whereClause}`, params),
+    executeQuery(`SELECT COUNT(DISTINCT ${PATH_EXPR}) as total FROM credentials ${whereClause}`, params),
+    executeQuery(`SELECT COUNT(*) as total FROM credentials ${whereClause}`, params),
+    executeQuery(`SELECT COUNT(*) as total FROM (
+      SELECT username, password, url FROM credentials ${whereClause} GROUP BY username, password, url HAVING count(*) > 1
+    ) as sub`, params),
+    executeQuery(`SELECT COUNT(DISTINCT device_id) as total FROM credentials ${whereClause}`, params)
   ])
 
-  // IMPORTANT: Cast all results to Number (ClickHouse returns String)
   return {
     totalSubdomains: Number((subRes as any[])[0]?.total) || 0,
     totalPaths: Number((pathRes as any[])[0]?.total) || 0,

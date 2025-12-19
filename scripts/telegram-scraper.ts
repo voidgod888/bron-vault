@@ -1,16 +1,18 @@
 import { TelegramClient } from "telegram"
 import { StringSession } from "telegram/sessions"
-import { executeQuery, initializeDatabase } from "../lib/mysql"
+import { executeQuery, initializeDatabase } from "../lib/db"
 import { processFileUploadFromPath } from "../lib/upload/file-upload-processor"
 import { telegramConfig } from "../lib/telegram-config"
 import fs from "fs"
 import path from "path"
 import { promisify } from "util"
 import { pipeline } from "stream"
-import input from "input" // Optional, for CLI interaction if needed
 // @ts-ignore
 import mime from "mime-types"
 import JSZip from "jszip"
+
+// Ensure dynamic imports for GramJS to avoid issues in some environments (e.g. Next.js edge, though this is a script)
+// Keeping imports standard here as it's a standalone script.
 
 const streamPipeline = promisify(pipeline)
 
@@ -44,10 +46,12 @@ function saveState(state: ScraperState) {
 }
 
 async function getSources() {
+  // Use SingleStore query
   return await executeQuery("SELECT * FROM sources WHERE enabled = TRUE AND type = 'telegram'") as any[]
 }
 
 async function updateLastScraped(id: number) {
+  // Use SingleStore query
   await executeQuery("UPDATE sources SET last_scraped_at = NOW() WHERE id = ?", [id])
 }
 

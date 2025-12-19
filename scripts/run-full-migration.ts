@@ -49,7 +49,7 @@ async function loadEnv() {
 async function runSchemaMigration() {
   console.log("📋 Step 1: Running schema migration...\n")
 
-  const { executeQuery } = await import("../lib/mysql")
+  const { executeQuery } = await import("../lib/db")
 
   try {
     // Drop FULLTEXT index (check first)
@@ -168,7 +168,7 @@ async function main() {
   console.log(`✅ Loaded credentials for database: ${dbName}\n`)
 
   // Import pool AFTER env is loaded to ensure correct credentials
-  const { pool } = await import("../lib/mysql")
+  const { pool } = await import("../lib/db")
   
   try {
     // Step 1: Schema Migration

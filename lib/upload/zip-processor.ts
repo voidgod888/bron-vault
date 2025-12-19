@@ -1,7 +1,7 @@
 import { mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
-import { executeQuery } from "@/lib/mysql"
+import { executeQuery } from "@/lib/db"
 import crypto from "crypto"
 import JSZip from "jszip"
 import {

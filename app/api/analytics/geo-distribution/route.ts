@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/mysql';
+import { executeQuery } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,32 +1,32 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { executeQuery as executeClickHouseQuery } from "@/lib/clickhouse"
+import { executeQuery } from "@/lib/db"
 import { validateRequest } from "@/lib/auth"
 
 /**
- * Build WHERE clause for domain matching that supports subdomains (ClickHouse version)
+ * Build WHERE clause for domain matching that supports subdomains (SingleStore/MySQL)
  * Matches both domain column and hostname extracted from URL
- * Uses named parameters for ClickHouse
  */
-function buildDomainWhereClauseClickHouse(targetDomain: string): { whereClause: string; params: Record<string, string> } {
-  // Use ilike for case-insensitive matching (data in DB might be mixed case)
+function buildDomainWhereClause(targetDomain: string): { whereClause: string; params: any[] } {
+  // Use LIKE for case-insensitive matching
   const whereClause = `(
-    domain = {domain:String} OR 
-    domain ilike concat('%.', {domain:String}) OR
-    url ilike {pattern1:String} OR
-    url ilike {pattern2:String} OR
-    url ilike {pattern3:String} OR
-    url ilike {pattern4:String}
+    domain = ? OR
+    domain LIKE ? OR
+    url LIKE ? OR
+    url LIKE ? OR
+    url LIKE ? OR
+    url LIKE ?
   )`
   
   return {
     whereClause,
-    params: {
-      domain: targetDomain,                              // Exact domain match (uses idx_domain)
-      pattern1: `%://${targetDomain}/%`,                   // URL exact: https://api.example.com/
-      pattern2: `%://${targetDomain}:%`,                   // URL exact with port: https://api.example.com:8080
-      pattern3: `%://%.${targetDomain}/%`,                  // URL subdomain: https://v1.api.example.com/
-      pattern4: `%://%.${targetDomain}:%`                   // URL subdomain with port: https://v1.api.example.com:8080
-    }
+    params: [
+      targetDomain,
+      `%.${targetDomain}`,
+      `%://${targetDomain}/%`,
+      `%://${targetDomain}:%`,
+      `%://%.${targetDomain}/%`,
+      `%://%.${targetDomain}:%`
+    ]
   }
 }
 
@@ -47,53 +47,50 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Searching for: "${query}" by ${type} (page: ${page}, limit: ${limit})`)
 
     if (type === "email") {
-      // Email search: Keep existing logic but add pagination
-      // ClickHouse: Use ilike for case-insensitive search
+      // Email search
       const pageNum = Number.parseInt(String(page)) || 1
       const limitNum = Number.parseInt(String(limit)) || 50
       const offset = (pageNum - 1) * limitNum
       
       const searchPattern = `%${query}%`
       
-      // Get total count first (ClickHouse)
-      // Convert: COUNT(DISTINCT device_id) -> uniq(device_id)
-      const totalCountResult = await executeClickHouseQuery(
+      // Get total count first (SingleStore)
+      const totalCountResult = await executeQuery(
         `
-        SELECT uniq(d.device_id) as total
+        SELECT COUNT(DISTINCT d.device_id) as total
         FROM devices d
         INNER JOIN credentials c ON d.device_id = c.device_id
-        WHERE c.username ilike {searchPattern:String}
+        WHERE c.username LIKE ?
         `,
-        { searchPattern },
+        [searchPattern],
       ) as any[]
       
       const total = totalCountResult[0]?.total || 0
       
-      // Get devices with pagination (ClickHouse)
-      // limitNum and offset are already validated as safe integers
-      const devicesResult = await executeClickHouseQuery(
+      // Get devices with pagination (SingleStore)
+      const devicesResult = await executeQuery(
         `
         SELECT DISTINCT d.device_id, d.device_name, d.upload_batch, d.upload_date
         FROM devices d
         INNER JOIN credentials c ON d.device_id = c.device_id
-        WHERE c.username ilike {searchPattern:String}
+        WHERE c.username LIKE ?
         ORDER BY d.upload_date DESC, d.device_name
         LIMIT ${limitNum} OFFSET ${offset}
         `,
-        { searchPattern },
+        [searchPattern],
       ) as any[]
       
-      // Get file count and system info for each device (ClickHouse)
+      // Get file count and system info for each device (SingleStore)
       const devices = []
       for (const row of devicesResult) {
-        const fileCount = await executeClickHouseQuery(
-          `SELECT count() as total FROM files WHERE device_id = {deviceId:String}`,
-          { deviceId: row.device_id },
+        const fileCount = await executeQuery(
+          `SELECT COUNT(*) as total FROM files WHERE device_id = ?`,
+          [row.device_id],
         ) as any[]
         
-        const systemInfo = await executeClickHouseQuery(
-          `SELECT log_date FROM systeminformation WHERE device_id = {deviceId:String} LIMIT 1`,
-          { deviceId: row.device_id },
+        const systemInfo = await executeQuery(
+          `SELECT log_date FROM systeminformation WHERE device_id = ? LIMIT 1`,
+          [row.device_id],
         ) as any[]
         
         devices.push({
@@ -122,25 +119,24 @@ export async function POST(request: NextRequest) {
       })
       
     } else if (type === "domain") {
-      // Domain search: Optimized with EXISTS and pagination
+      // Domain search
       const pageNum = Math.max(1, Number.parseInt(String(page)) || 1)
-      const limitNum = Math.max(1, Math.min(100, Number.parseInt(String(limit)) || 50)) // Limit between 1-100
+      const limitNum = Math.max(1, Math.min(100, Number.parseInt(String(limit)) || 50))
       const offset = Math.max(0, (pageNum - 1) * limitNum)
       
-      // Normalize domain (same as /domain-search)
+      // Normalize domain
       let normalizedDomain = query.trim().toLowerCase()
       normalizedDomain = normalizedDomain.replace(/^https?:\/\//, '')
       normalizedDomain = normalizedDomain.replace(/^www\./, '')
       normalizedDomain = normalizedDomain.replace(/\/$/, '')
       normalizedDomain = normalizedDomain.split('/')[0].split(':')[0]
       
-      // Build WHERE clause (ClickHouse version with named parameters)
-      const { whereClause, params } = buildDomainWhereClauseClickHouse(normalizedDomain)
+      // Build WHERE clause (SingleStore/MySQL)
+      const { whereClause, params } = buildDomainWhereClause(normalizedDomain)
       
-      // Get total count first (ClickHouse)
-      // Convert: COUNT(DISTINCT device_id) -> uniq(device_id)
-      const totalCountResult = await executeClickHouseQuery(
-        `SELECT uniq(device_id) as total
+      // Get total count first (SingleStore)
+      const totalCountResult = await executeQuery(
+        `SELECT COUNT(DISTINCT device_id) as total
          FROM credentials
          WHERE ${whereClause}`,
         params,
@@ -148,16 +144,14 @@ export async function POST(request: NextRequest) {
       
       const total = totalCountResult[0]?.total || 0
       
-      // Get devices with pagination (ClickHouse)
-      // ClickHouse doesn't support EXISTS with correlated subqueries like MySQL
-      // Use IN subquery instead (more efficient than JOIN for this case)
-      // limitNum and offset are already validated as safe integers
-      const devicesResult = await executeClickHouseQuery(
+      // Get devices with pagination (SingleStore)
+      // Use IN subquery for efficiency
+      const devicesResult = await executeQuery(
         `SELECT DISTINCT d.device_id, d.device_name, d.upload_batch, d.upload_date
          FROM devices d
          WHERE d.device_id IN (
            SELECT DISTINCT device_id
-           FROM credentials c
+           FROM credentials
            WHERE ${whereClause}
          )
          ORDER BY d.upload_date DESC, d.device_name
@@ -167,31 +161,32 @@ export async function POST(request: NextRequest) {
       
       console.log(`📊 Found ${devicesResult.length} devices (page ${pageNum}, total: ${total})`)
       
-      // Get file count, matching files, and system info for each device (ClickHouse)
+      // Get file count, matching files, and system info for each device (SingleStore)
       const devices = []
       for (const row of devicesResult) {
         // Get file count
-        const fileCount = await executeClickHouseQuery(
-          `SELECT count() as total FROM files WHERE device_id = {deviceId:String}`,
-          { deviceId: row.device_id },
+        const fileCount = await executeQuery(
+          `SELECT COUNT(*) as total FROM files WHERE device_id = ?`,
+          [row.device_id],
         ) as any[]
         
         // Get matching file paths (files that contain matching credentials)
-        // Merge params: device_id + whereClause params
-        const matchingFilesParams = { ...params, deviceId: row.device_id }
-        const matchingFilesResult = await executeClickHouseQuery(
+        // Merge params: whereClause params + device_id
+        // NOTE: params for WHERE clause + row.device_id
+        const matchingFilesParams = [...params, row.device_id]
+        const matchingFilesResult = await executeQuery(
           `SELECT DISTINCT file_path
            FROM credentials
-           WHERE device_id = {deviceId:String} AND ${whereClause} AND file_path IS NOT NULL`,
+           WHERE ${whereClause} AND file_path IS NOT NULL AND device_id = ?`,
           matchingFilesParams,
         ) as any[]
         
         const matchingFiles = matchingFilesResult.map((f: any) => f.file_path).filter(Boolean)
         
         // Get system info
-        const systemInfo = await executeClickHouseQuery(
-          `SELECT log_date FROM systeminformation WHERE device_id = {deviceId:String} LIMIT 1`,
-          { deviceId: row.device_id },
+        const systemInfo = await executeQuery(
+          `SELECT log_date FROM systeminformation WHERE device_id = ? LIMIT 1`,
+          [row.device_id],
         ) as any[]
         
         devices.push({

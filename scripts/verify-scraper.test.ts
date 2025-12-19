@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs'
 
 // Mock dependencies
-vi.mock('../lib/mysql', () => ({
+vi.mock('../lib/db', () => ({
   executeQuery: vi.fn(),
   initializeDatabase: vi.fn().mockResolvedValue(undefined),
 }))

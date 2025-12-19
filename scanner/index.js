@@ -21,12 +21,16 @@ const logger = winston.createLogger({
 // Environment variables
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = process.env.REDIS_PORT || 6379;
+
+// SingleStore (MySQL compatible) configuration
 const MYSQL_CONFIG = {
   host: process.env.MYSQL_HOST || 'localhost',
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD,
   database: process.env.MYSQL_DATABASE,
-  port: process.env.MYSQL_PORT || 3306
+  port: process.env.MYSQL_PORT || 3306,
+  // Add flags for SingleStore compatibility if needed, though standard mysql2 works fine usually
+  flags: ['-FOUND_ROWS']
 };
 
 // Top ports to scan
@@ -141,6 +145,7 @@ async function processDomain(domain, priority) {
   }
 
   // 5. Save Results
+  // SingleStore handles ON DUPLICATE KEY UPDATE mostly compatible with MySQL
   try {
     await pool.execute(
       `INSERT INTO scanned_hosts
@@ -177,7 +182,7 @@ async function processDomain(domain, priority) {
 }
 
 async function main() {
-  logger.info("Scanner Worker Started");
+  logger.info("Scanner Worker Started (SingleStore)");
 
   // Ensure Redis connection
   redis.on('error', (err) => logger.error('Redis Client Error', err));

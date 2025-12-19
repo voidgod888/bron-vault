@@ -7,77 +7,30 @@ networks:
 
 services:
   # -----------------------------------------------------------
-  # 1. DATABASE (MySQL 8.0)
+  # 1. SINGLESTORE (Replaces MySQL & ClickHouse)
   # -----------------------------------------------------------
-  mysql:
-    image: mysql:8.0
-    container_name: bronvault_mysql
+  singlestore:
+    image: singlestore/cluster-in-a-box:latest
+    container_name: bronvault_db
     restart: always
-    hostname: mysql_host
-    # Network alias to ensure hostname mysql_host can be resolved
-    # by other containers (especially ClickHouse for MaterializedMySQL)
-    networks:
-      default:
-        aliases:
-          - mysql_host
-          - mysql  # Can also be accessed via service name
-    # Command for MySQL 8.0 - configuration for MaterializedMySQL replication
-    command: >
-      --log-bin=mysql-bin 
-      --binlog-format=ROW
-      --server-id=1
-      --gtid-mode=ON
-      --enforce-gtid-consistency=ON
-      --default-authentication-plugin=mysql_native_password
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - ./mysql-data:/var/lib/mysql
-      # Auto-import SQL schema
-      - ./scripts/009_create_complete_schema.sql:/docker-entrypoint-initdb.d/init.sql
+      SINGLESTORE_LICENSE_KEY: ${SINGLESTORE_LICENSE_KEY}
+      ROOT_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
+      - "8080:8080" # SingleStore Studio
+    volumes:
+      - ./singlestore-data:/var/lib/memsql
+      - ./scripts/singlestore_schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      # Healthcheck for MySQL 8.0
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "memsql-admin", "ping-node", "--password", "${MYSQL_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
   # -----------------------------------------------------------
-  # 2. ANALYTICS (ClickHouse)
-  # -----------------------------------------------------------
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.3
-    container_name: bronvault_clickhouse
-    restart: always
-    ports:
-      - "8123:8123"
-      - "9000:9000"
-    environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-    volumes:
-      - ./clickhouse-data:/var/lib/clickhouse
-    # Note: ClickHouse will connect to MySQL using hostname "mysql_host"
-    # MySQL container hostname is set as "mysql_host", so it can be resolved
-    # by other containers in the same network
-    depends_on:
-      mysql:
-        condition: service_healthy
-
-  # -----------------------------------------------------------
-  # 3. REDIS (Job Queue)
+  # 2. REDIS (Job Queue)
   # -----------------------------------------------------------
   redis:
     image: redis:7-alpine
@@ -89,7 +42,7 @@ services:
       - ./redis-data:/data
 
   # -----------------------------------------------------------
-  # 4. SCANNER WORKER (Background Job)
+  # 3. SCANNER WORKER (Background Job)
   # -----------------------------------------------------------
   scanner:
     build:
@@ -98,23 +51,23 @@ services:
     container_name: bronvault_scanner
     restart: always
     environment:
-      # Database Connection - MySQL
-      MYSQL_HOST: mysql
+      # Database Connection - SingleStore (MySQL Compatible)
+      MYSQL_HOST: singlestore
       MYSQL_PORT: 3306
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       # Redis Connection
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
-      mysql:
+      singlestore:
         condition: service_healthy
       redis:
         condition: service_started
 
   # -----------------------------------------------------------
-  # 5. MAIN APP (Next.js)
+  # 4. MAIN APP (Next.js)
   # -----------------------------------------------------------
   app:
     build:
@@ -125,48 +78,17 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Database Connection - MySQL
-      MYSQL_HOST: mysql
+      # Database Connection - SingleStore
+      MYSQL_HOST: singlestore
       MYSQL_PORT: 3306
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}"
-      # Database Connection - ClickHouse
-      CLICKHOUSE_HOST: "http://clickhouse:8123"
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DB}
+      DATABASE_URL: "mysql://root:${MYSQL_PASSWORD}@singlestore:3306/${MYSQL_DATABASE}"
+      # ClickHouse vars REMOVED
       NODE_ENV: production
     volumes:
        - ./uploads:/app/uploads
     depends_on:
-      mysql:
+      singlestore:
         condition: service_healthy
-      clickhouse:
-        condition: service_started
-      setup:
-        condition: service_completed_successfully
-
-  # -----------------------------------------------------------
-  # 6. SETUP WORKER (Run Once for Configuration)
-  # -----------------------------------------------------------
-  setup:
-    build:
-      context: .
-      dockerfile: Dockerfile.setup
-    container_name: bronvault_setup
-    # Docker will load all variables from .env into the setup container
-    # Make sure the .env file contains all required variables:
-    # MYSQL_ROOT_PASSWORD, MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD,
-    # CLICKHOUSE_USER, CLICKHOUSE_PASSWORD, CLICKHOUSE_DB,
-    # SYNC_USER, SYNC_PASSWORD
-    env_file:
-      - .env
-    depends_on:
-      mysql:
-        condition: service_healthy
-      clickhouse:
-        condition: service_started
-    # This service will exit automatically after completion (exit 0)
-    restart: "no"
