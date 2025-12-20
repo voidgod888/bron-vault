@@ -151,7 +151,7 @@ export default function LoginPage() {
                 <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
               </div>
             </div>
-            <p className="text-white/60 font-medium">Checking system status...</p>
+            <p className="text-white/60 font-medium" role="status" aria-live="polite">Checking system status...</p>
           </div>
         </div>
       </div>
@@ -349,8 +349,9 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      {showPassword ? <EyeOff className="w-5 h-5" aria-hidden="true" /> : <Eye className="w-5 h-5" aria-hidden="true" />}
                     </button>
                     <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-500/0 via-red-500/5 to-red-500/0 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
                   </div>
