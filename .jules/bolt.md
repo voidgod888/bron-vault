@@ -1,5 +1,5 @@
-## 2024-05-23 - Performance Optimization: Memoization in SearchResults
+## 2024-05-23 - Performance Optimization: Memoization in FileTreeViewer
 
-**Learning:** Large lists in React components without memoization of derived data can lead to unnecessary re-computations on every render, even if the data hasn't changed. In `SearchResults.tsx`, the `groupedResults` derived state was being recalculated on every render, including when parent state changed (like selection), which is inefficient for large datasets.
+**Learning:** The `FileTreeViewer` component was recalculating the entire file tree structure (O(n log n)) on every render, which was particularly expensive for devices with thousands of files. This caused UI lag when interacting with other elements in the panel.
 
-**Action:** Applied `useMemo` to the expensive grouping operation and `React.memo` to child components to prevent unnecessary work. Also moved static regex patterns out of utility functions to avoid recompilation.
+**Action:** Moved the pure function `buildASCIITree` outside the component scope to avoid function recreation and wrapped its execution in `useMemo` to cache the result based on file inputs. This ensures the expensive tree building only happens when data actually changes.
