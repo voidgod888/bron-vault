@@ -151,6 +151,7 @@ export function SavedSearches({ onSelectSearch, currentQuery, currentType }: Sav
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={(e) => handleDelete(search.id, e)}
+                          aria-label={`Delete saved search ${search.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -166,7 +167,12 @@ export function SavedSearches({ onSelectSearch, currentQuery, currentType }: Sav
         {currentQuery && (
           <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" title="Save current search">
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Save current search"
+                aria-label="Save current search"
+              >
                  <Bookmark className="h-4 w-4 text-muted-foreground hover:text-primary" />
               </Button>
             </DialogTrigger>

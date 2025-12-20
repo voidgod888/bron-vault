@@ -238,7 +238,12 @@ export default function SourcesPage() {
                   </TableCell>
                   <TableCell>{source.last_scraped_at ? new Date(source.last_scraped_at).toLocaleString() : "Never"}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteSource(source.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteSource(source.id)}
+                      aria-label={`Delete source ${source.name}`}
+                    >
                       <Trash2 className="w-4 h-4 text-red-500" />
                     </Button>
                   </TableCell>
