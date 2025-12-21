@@ -1,7 +1,7 @@
 "use client"
 
-import React from "react"
-import { Search, Mail, Globe } from "lucide-react"
+import React, { useRef } from "react"
+import { Search, Mail, Globe, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -27,14 +27,23 @@ export function SearchInterface({
   onSearch,
   onDetectSearchType,
 }: SearchInterfaceProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleClear = () => {
+    setSearchQuery("")
+    onDetectSearchType("")
+    inputRef.current?.focus()
+  }
+
   return (
     <div className="flex flex-col items-center space-y-4">
       <Card className="glass-card border-border w-full max-w-3xl mx-auto">
         <CardContent className="p-6">
           <div className="flex items-center space-x-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" aria-hidden="true" />
               <Input
+                ref={inputRef}
                 type="text"
                 placeholder="Search by email or domain..."
                 value={searchQuery}
@@ -42,9 +51,19 @@ export function SearchInterface({
                   setSearchQuery(e.target.value)
                   onDetectSearchType(e.target.value)
                 }}
-                onKeyPress={(e) => e.key === "Enter" && onSearch()}
-                className="pl-10 h-12 text-lg glass border-border/50 text-foreground placeholder:text-muted-foreground"
+                onKeyDown={(e) => e.key === "Enter" && onSearch()}
+                className="pl-10 pr-10 h-12 text-lg glass border-border/50 text-foreground placeholder:text-muted-foreground"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
             </div>
             <Button
               onClick={onSearch}
