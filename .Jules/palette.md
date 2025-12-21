@@ -1,0 +1,3 @@
+## 2025-12-21 - [Search Input Clear Button]
+**Learning:** Adding a "clear" button to search inputs significantly improves usability, especially for long queries. When implementing this pattern using `lucide-react` icons inside an input wrapper, ensure the button is only rendered when there is content (`searchQuery &&`) and use `aria-label="Clear search"` for accessibility. Using a `ref` to refocus the input after clearing maintains the user's flow.
+**Action:** Always consider adding clear actions to text inputs that are likely to have repeated use or long values. Ensure keyboard focus management is handled (refocus input after clear).
