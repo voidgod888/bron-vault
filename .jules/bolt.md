@@ -1,5 +1,8 @@
-## 2024-05-23 - Performance Optimization: Memoization in FileTreeViewer
+## 2024-05-23 - Performance Optimization: TooltipProvider in Tables
 
-**Learning:** The `FileTreeViewer` component was recalculating the entire file tree structure (O(n log n)) on every render, which was particularly expensive for devices with thousands of files. This caused UI lag when interacting with other elements in the panel.
+**Learning:** `TooltipProvider` from Radix UI is a context provider. Rendering it inside every cell of a large table (e.g., in `DeviceSoftwareTable` or `DeviceCredentialsTable`) creates hundreds of context providers, significantly increasing component depth and memory usage, leading to sluggish rendering and scroll performance.
 
-**Action:** Moved the pure function `buildASCIITree` outside the component scope to avoid function recreation and wrapped its execution in `useMemo` to cache the result based on file inputs. This ensures the expensive tree building only happens when data actually changes.
+**Action:**
+1. Moved `TooltipProvider` to wrap the entire `Table` (or parent container) instead of individual cells.
+2. Memoized cell components (`HoverableCell`, `UrlCell`, `CopyableCell`) using `React.memo` to prevent unnecessary re-renders when the table updates.
+3. This reduces the number of context providers from O(n) (where n is rows × cols) to O(1).
