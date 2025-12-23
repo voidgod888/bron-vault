@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { LoadingTable } from "@/components/ui/loading"
 
 interface Credential {
   browser: string | null
@@ -103,6 +104,7 @@ const UrlCell = ({ url }: { url: string }) => {
                 }}
                 className="p-1 hover:bg-white/10 rounded transition-colors"
                 title="Copy URL"
+                aria-label="Copy URL"
               >
                 <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
               </button>
@@ -161,6 +163,7 @@ const CopyableCell = ({
                 }}
                 className="p-1 hover:bg-white/10 rounded transition-colors"
                 title={`Copy ${label}`}
+                aria-label={`Copy ${label}`}
               >
                 <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
               </button>
@@ -230,8 +233,8 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
 
   if (isLoadingCredentials) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <p className="text-xs text-foreground">Loading credentials...</p>
+      <div className="h-32 p-4">
+        <LoadingTable rows={5} columns={4} />
       </div>
     )
   }
@@ -273,6 +276,7 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
               value={credentialsSearchQuery}
               onChange={(e) => setCredentialsSearchQuery(e.target.value)}
               className="w-full h-9 text-sm glass-card border-border/50 text-foreground placeholder:text-muted-foreground"
+              aria-label="Search credentials"
             />
           </div>
           <Button
@@ -281,6 +285,7 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
             onClick={() => setShowPasswords(!showPasswords)}
             className="h-9 px-3 flex items-center space-x-2 shrink-0 glass-card hover:border-primary/30 transition-colors"
             title={showPasswords ? "Hide passwords" : "Show passwords"}
+            aria-pressed={showPasswords}
           >
             {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             <span className="text-xs">{showPasswords ? "Hide" : "Show"}</span>
