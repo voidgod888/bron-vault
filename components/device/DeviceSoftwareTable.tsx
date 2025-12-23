@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { LoadingTable } from "@/components/ui/loading"
 
 interface Software {
   software_name: string
@@ -131,8 +132,8 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
 
   if (isLoadingSoftware) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <p className="text-xs text-foreground">Loading software...</p>
+      <div className="h-32 p-4">
+        <LoadingTable rows={5} columns={2} />
       </div>
     )
   }
@@ -176,6 +177,7 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
               value={softwareSearchQuery}
               onChange={(e) => setSoftwareSearchQuery(e.target.value)}
               className="w-full h-9 text-sm glass-card border-border/50 text-foreground placeholder:text-muted-foreground"
+              aria-label="Search software"
             />
           </div>
           <Button
@@ -188,6 +190,7 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
                 : "glass-card"
             }`}
             title={deduplicate ? "Show duplicates" : "Hide duplicates"}
+            aria-pressed={deduplicate}
           >
             <Filter className="h-4 w-4" />
             <span className="text-xs">{deduplicate ? "Show All" : "Deduplicate"}</span>
