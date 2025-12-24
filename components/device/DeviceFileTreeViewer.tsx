@@ -1,19 +1,11 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Download, Eye, Image as ImageIcon, Book, Package, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
-interface StoredFile {
-  file_path: string
-  file_name: string
-  parent_path: string
-  is_directory: boolean
-  file_size?: number
-  has_content: boolean
-}
+import { StoredFile, TreeNode } from "@/lib/types"
 
 interface DeviceFileData {
   deviceId: string
@@ -31,16 +23,80 @@ interface DeviceFileTreeViewerProps {
   onDownloadAllData?: (deviceId: string, deviceName: string) => void
 }
 
-// ASCII Tree Node Interface - IntelX Style
-interface TreeNode {
-  name: string
-  path: string
-  isDirectory: boolean
-  hasMatch: boolean
-  hasContent: boolean
-  size?: number
-  children: TreeNode[]
-  level: number
+// ASCII TREE BUILDER - IntelX Style with Advanced Features
+const buildASCIITree = (files: StoredFile[], matchingFiles: string[]): TreeNode[] => {
+  const tree: TreeNode[] = []
+  const nodeMap = new Map<string, TreeNode>()
+
+  // Sort files by path to ensure proper hierarchy
+  const sortedFiles = [...files].sort((a, b) => a.file_path.localeCompare(b.file_path))
+
+  for (const file of sortedFiles) {
+    const pathParts = file.file_path.split("/").filter((part) => part.length > 0)
+    let currentPath = ""
+
+    for (let i = 0; i < pathParts.length; i++) {
+      const part = pathParts[i]
+      const parentPath = currentPath
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+      const isLastPart = i === pathParts.length - 1
+      const isDirectory = !isLastPart || file.is_directory
+
+      if (!nodeMap.has(currentPath)) {
+        // Clean the name - remove leading numbers (IntelX style)
+        let cleanName = part.replace(/^\d+[\s.-]*/, "")
+        if (!cleanName || /^[\d\s.-]*$/.test(cleanName)) {
+          cleanName = isDirectory ? "Folder" : "File"
+        }
+
+        const hasDirectMatch = isLastPart && matchingFiles.includes(file.file_path)
+
+        const node: TreeNode = {
+          name: cleanName,
+          path: currentPath,
+          isDirectory,
+          hasMatch: hasDirectMatch,
+          hasContent: isLastPart ? file.has_content : false,
+          size: isLastPart ? file.file_size : undefined,
+          children: [],
+          level: i,
+        }
+
+        nodeMap.set(currentPath, node)
+
+        // Add to parent or root
+        if (parentPath && nodeMap.has(parentPath)) {
+          const parent = nodeMap.get(parentPath)!
+          parent.children.push(node)
+        } else if (!parentPath) {
+          tree.push(node)
+        }
+      }
+    }
+  }
+
+  // Sort children within each node - Files first, then directories (IntelX style)
+  const sortChildren = (node: TreeNode) => {
+    node.children.sort((a, b) => {
+      // Files first, directories second
+      if (!a.isDirectory && b.isDirectory) return -1
+      if (a.isDirectory && !b.isDirectory) return 1
+      // Within same type, sort alphabetically
+      return a.name.localeCompare(b.name)
+    })
+    node.children.forEach(sortChildren)
+  }
+
+  tree.forEach(sortChildren)
+
+  // Sort root level - Files first, directories second
+  tree.sort((a, b) => {
+    if (!a.isDirectory && b.isDirectory) return -1
+    if (a.isDirectory && !b.isDirectory) return 1
+    return a.name.localeCompare(b.name)
+  })
+
+  return tree
 }
 
 export function DeviceFileTreeViewer({
@@ -92,81 +148,10 @@ export function DeviceFileTreeViewer({
     return `${(size / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  // ASCII TREE BUILDER - IntelX Style with Advanced Features
-  const buildASCIITree = (files: StoredFile[], matchingFiles: string[]): TreeNode[] => {
-    const tree: TreeNode[] = []
-    const nodeMap = new Map<string, TreeNode>()
-
-    // Sort files by path to ensure proper hierarchy
-    const sortedFiles = [...files].sort((a, b) => a.file_path.localeCompare(b.file_path))
-
-    for (const file of sortedFiles) {
-      const pathParts = file.file_path.split("/").filter((part) => part.length > 0)
-      let currentPath = ""
-
-      for (let i = 0; i < pathParts.length; i++) {
-        const part = pathParts[i]
-        const parentPath = currentPath
-        currentPath = currentPath ? `${currentPath}/${part}` : part
-        const isLastPart = i === pathParts.length - 1
-        const isDirectory = !isLastPart || file.is_directory
-
-        if (!nodeMap.has(currentPath)) {
-          // Clean the name - remove leading numbers (IntelX style)
-          let cleanName = part.replace(/^\d+[\s.-]*/, "")
-          if (!cleanName || /^[\d\s.-]*$/.test(cleanName)) {
-            cleanName = isDirectory ? "Folder" : "File"
-          }
-
-          const hasDirectMatch = isLastPart && matchingFiles.includes(file.file_path)
-
-          const node: TreeNode = {
-            name: cleanName,
-            path: currentPath,
-            isDirectory,
-            hasMatch: hasDirectMatch,
-            hasContent: isLastPart ? file.has_content : false,
-            size: isLastPart ? file.file_size : undefined,
-            children: [],
-            level: i,
-          }
-
-          nodeMap.set(currentPath, node)
-
-          // Add to parent or root
-          if (parentPath && nodeMap.has(parentPath)) {
-            const parent = nodeMap.get(parentPath)!
-            parent.children.push(node)
-          } else if (!parentPath) {
-            tree.push(node)
-          }
-        }
-      }
-    }
-
-    // Sort children within each node - Files first, then directories (IntelX style)
-    const sortChildren = (node: TreeNode) => {
-      node.children.sort((a, b) => {
-        // Files first, directories second
-        if (!a.isDirectory && b.isDirectory) return -1
-        if (a.isDirectory && !b.isDirectory) return 1
-        // Within same type, sort alphabetically
-        return a.name.localeCompare(b.name)
-      })
-      node.children.forEach(sortChildren)
-    }
-
-    tree.forEach(sortChildren)
-
-    // Sort root level - Files first, directories second
-    tree.sort((a, b) => {
-      if (!a.isDirectory && b.isDirectory) return -1
-      if (a.isDirectory && !b.isDirectory) return 1
-      return a.name.localeCompare(b.name)
-    })
-
-    return tree
-  }
+  const treeNodes = useMemo(() => {
+    if (!deviceFileData) return []
+    return buildASCIITree(deviceFileData.files, deviceFileData.matchingFiles)
+  }, [deviceFileData])
 
   // Update the file tree renderer to show visual indicators
   const renderASCIITree = (nodes: TreeNode[], isLast: boolean[] = []): React.ReactNode => {
@@ -378,7 +363,7 @@ export function DeviceFileTreeViewer({
       </div>
       <div className="glass p-3 rounded border border-white/5 overflow-x-auto">
         <div className="min-w-max">
-          {renderASCIITree(buildASCIITree(deviceFileData.files, deviceFileData.matchingFiles))}
+          {renderASCIITree(treeNodes)}
         </div>
       </div>
       <div className="mt-3 mb-2 text-xs text-muted-foreground">
