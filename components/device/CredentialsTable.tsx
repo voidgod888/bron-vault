@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useMemo } from "react"
-import { Monitor, Globe, User, Lock, Eye, EyeOff, Copy } from "lucide-react"
+import { Monitor, Globe, User, Lock, Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { CopyButton } from "@/components/ui/copy-button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -106,16 +107,11 @@ const UrlCell = ({ url }: { url: string }) => {
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-muted-foreground">Full URL</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigator.clipboard.writeText(url)
-                }}
-                className="p-1 hover:bg-white/5 rounded transition-colors"
-                title="Copy URL"
-              >
-                <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-              </button>
+              <CopyButton
+                value={url}
+                label="Copy URL"
+                className="h-6 w-6"
+              />
             </div>
             <div className="text-xs font-mono text-foreground break-all bg-white/5 p-2 rounded border border-border/50">
               {url}
@@ -164,16 +160,11 @@ const CopyableCell = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigator.clipboard.writeText(content)
-                }}
-                className="p-1 hover:bg-white/5 rounded transition-colors"
-                title={`Copy ${label}`}
-              >
-                <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-              </button>
+              <CopyButton
+                value={content}
+                label={`Copy ${label}`}
+                className="h-6 w-6"
+              />
             </div>
             <div className={`text-xs ${isPassword ? 'font-mono' : ''} text-foreground break-all bg-white/5 p-2 rounded border border-border/50`}>
               {content}

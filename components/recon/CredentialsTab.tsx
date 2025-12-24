@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Key, Eye, EyeOff, Globe, User, Lock, Calendar, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Copy, HardDrive } from "lucide-react"
+import { CopyButton } from "@/components/ui/copy-button"
+import { Key, Eye, EyeOff, Globe, User, Lock, Calendar, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, HardDrive } from "lucide-react"
 import { LoadingState } from "@/components/ui/loading"
 import {
   Select,
@@ -96,16 +97,11 @@ const CopyableCell = ({
           <div className="space-y-2">
             <div key={`${tooltipKey}-header`} className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigator.clipboard.writeText(content || "")
-                }}
-                className="p-1 hover:bg-white/5 rounded transition-colors"
-                title={`Copy ${label}`}
-              >
-                <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-              </button>
+              <CopyButton
+                value={content || ""}
+                label={`Copy ${label}`}
+                className="h-6 w-6"
+              />
             </div>
             <div key={`${tooltipKey}-content`} className={`text-xs ${isPassword ? 'font-mono' : ''} text-foreground break-all bg-white/5 p-2 rounded border border-border/50`}>
               {content || "-"}
@@ -516,16 +512,11 @@ export function CredentialsTab({ targetDomain, searchType = 'domain', keywordMod
                               <div className="space-y-2">
                                 <div key={`url-header-${item.id}`} className="flex items-center justify-between gap-2">
                                   <span className="text-xs font-semibold text-muted-foreground">Full URL</span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      navigator.clipboard.writeText(item.url)
-                                    }}
-                                    className="p-1 hover:bg-white/5 rounded transition-colors"
-                                    title="Copy URL"
-                                  >
-                                    <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-                                  </button>
+                                  <CopyButton
+                                    value={item.url}
+                                    label="Copy URL"
+                                    className="h-6 w-6"
+                                  />
                                 </div>
                                 <div key={`url-content-${item.id}`} className="text-xs font-mono text-foreground break-all bg-white/5 p-2 rounded border border-border/50">
                                   {item.url}
