@@ -31,22 +31,20 @@ const HoverableCell = ({
   const displayContent = maxLength && content.length > maxLength ? `${content.substring(0, maxLength)}...` : content
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="cursor-default hover:bg-white/5 rounded px-1 py-0.5 transition-colors">
-            {children || <span className="text-foreground">{displayContent}</span>}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="max-w-xs break-all glass-card shadow-lg p-3"
-        >
-          <div className="font-mono text-xs select-text text-foreground">{content}</div>
-          <div className="text-xs text-muted-foreground mt-1">Highlight text to copy manually</div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="cursor-default hover:bg-white/5 rounded px-1 py-0.5 transition-colors">
+          {children || <span className="text-foreground">{displayContent}</span>}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="max-w-xs break-all glass-card shadow-lg p-3"
+      >
+        <div className="font-mono text-xs select-text text-foreground">{content}</div>
+        <div className="text-xs text-muted-foreground mt-1">Highlight text to copy manually</div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -159,9 +157,10 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Search Bar Section */}
-      <div className="space-y-3">
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Search Bar Section */}
+        <div className="space-y-3">
         <div className="text-sm text-muted-foreground">
           Found {deviceSoftware.length} software installed on this device
           {deduplicate && ` (${filteredSoftware.length} unique)`}
@@ -239,6 +238,7 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
           </Button>
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
