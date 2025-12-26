@@ -39,22 +39,20 @@ const HoverableCell = ({
   const displayContent = maxLength && content.length > maxLength ? `${content.substring(0, maxLength)}...` : content
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="cursor-default hover:glass-card rounded px-1 py-0.5 transition-colors">
-            {children || <span className="text-foreground">{displayContent}</span>}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="max-w-xs break-all glass-card shadow-lg p-3"
-        >
-          <div className="font-mono text-xs select-text text-foreground">{content}</div>
-          <div className="text-xs text-muted-foreground mt-1">Highlight text to copy manually</div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="cursor-default hover:glass-card rounded px-1 py-0.5 transition-colors">
+          {children || <span className="text-foreground">{displayContent}</span>}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="max-w-xs break-all glass-card shadow-lg p-3"
+      >
+        <div className="font-mono text-xs select-text text-foreground">{content}</div>
+        <div className="text-xs text-muted-foreground mt-1">Highlight text to copy manually</div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -178,8 +176,9 @@ export function SoftwareTable({
   )
 
   return (
-    <div className="space-y-4">
-      {!hideSearchBar && searchBarSection}
+    <TooltipProvider>
+      <div className="space-y-4">
+        {!hideSearchBar && searchBarSection}
       <div className="glass-card border border-border/50 rounded-lg overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] sm:max-h-[calc(100vh-350px)] pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
         <Table>
           <TableHeader>
@@ -225,7 +224,8 @@ export function SoftwareTable({
           </Button>
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
 

@@ -1,4 +1,5 @@
 import { writeFile, unlink } from "fs/promises"
+import { existsSync } from "fs"
 import { ensureDirectory } from "@/lib/upload/fs-utils"
 import path from "path"
 import { initializeDatabase } from "@/lib/db"
