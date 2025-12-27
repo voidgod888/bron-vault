@@ -74,12 +74,12 @@ export async function GET(request: NextRequest) {
     try {
       [
         deviceStatsResult,
-      fileCountResult,
-      aggregatedStatsResult,
-      topPasswordsResult,
-      recentDevicesResult,
-      batchStatsResult
-    ] = await Promise.all([
+        fileCountResult,
+        aggregatedStatsResult,
+        topPasswordsResult,
+        recentDevicesResult,
+        batchStatsResult
+      ] = (await Promise.all([
         // SingleStore: Count devices (unique device_id due to Shard Key)
         executeQuery(`
           SELECT 
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
         ORDER BY upload_date DESC 
         LIMIT 10
       `)
-    ])
+      ])) as any[]
     } catch (error) {
       console.error("❌ Error executing SingleStore queries:", error)
       throw error
