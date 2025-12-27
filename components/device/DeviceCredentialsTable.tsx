@@ -55,65 +55,61 @@ const HoverableCell = ({
     : "cursor-default hover:bg-white/5 rounded px-1 py-0.5 transition-colors w-full block truncate"
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className={containerClass}>
-            {children ||
-              (type === "password" ? (
-                <span className="font-mono text-foreground">{displayContent}</span>
-              ) : (
-                <span className="text-foreground">{displayContent}</span>
-              ))}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="max-w-xs break-all glass-card shadow-lg p-3"
-        >
-          <div className="font-mono text-xs select-text text-foreground">{content}</div>
-          <div className="text-xs text-muted-foreground mt-1">Highlight text to copy manually</div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className={containerClass}>
+          {children ||
+            (type === "password" ? (
+              <span className="font-mono text-foreground">{displayContent}</span>
+            ) : (
+              <span className="text-foreground">{displayContent}</span>
+            ))}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="max-w-xs break-all glass-card shadow-lg p-3"
+      >
+        <div className="font-mono text-xs select-text text-foreground">{content}</div>
+        <div className="text-xs text-muted-foreground mt-1">Highlight text to copy manually</div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
 // URL Cell with copy functionality
 const UrlCell = ({ url }: { url: string }) => {
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="truncate max-w-[350px] cursor-pointer hover:bg-white/5 rounded px-1 py-0.5 transition-colors font-mono">
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="truncate max-w-[350px] cursor-pointer hover:bg-white/5 rounded px-1 py-0.5 transition-colors font-mono">
+          {url}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="glass-card shadow-lg p-3 max-w-md z-50"
+      >
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-muted-foreground">Full URL</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigator.clipboard.writeText(url)
+              }}
+              className="p-1 hover:bg-white/10 rounded transition-colors"
+              title="Copy URL"
+            >
+              <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
+            </button>
+          </div>
+          <div className="text-xs font-mono text-foreground break-all glass p-2 rounded border border-white/5">
             {url}
           </div>
-        </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
-          className="glass-card shadow-lg p-3 max-w-md z-50"
-        >
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted-foreground">Full URL</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigator.clipboard.writeText(url)
-                }}
-                className="p-1 hover:bg-white/10 rounded transition-colors"
-                title="Copy URL"
-              >
-                <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-              </button>
-            </div>
-            <div className="text-xs font-mono text-foreground break-all glass p-2 rounded border border-white/5">
-              {url}
-            </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -134,44 +130,42 @@ const CopyableCell = ({
   const displayContent = maxLength && content.length > maxLength ? `${content.substring(0, maxLength)}...` : content
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="cursor-pointer hover:bg-white/5 rounded px-1 py-0.5 transition-colors w-full block truncate">
-            {children || (
-              isPassword ? (
-                <span className="font-mono text-foreground">{displayContent}</span>
-              ) : (
-                <span className="text-foreground">{displayContent}</span>
-              )
-            )}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="cursor-pointer hover:bg-white/5 rounded px-1 py-0.5 transition-colors w-full block truncate">
+          {children || (
+            isPassword ? (
+              <span className="font-mono text-foreground">{displayContent}</span>
+            ) : (
+              <span className="text-foreground">{displayContent}</span>
+            )
+          )}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="glass-card shadow-lg p-3 max-w-md z-50"
+      >
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigator.clipboard.writeText(content)
+              }}
+              className="p-1 hover:bg-white/10 rounded transition-colors"
+              title={`Copy ${label}`}
+            >
+              <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
+            </button>
           </div>
-        </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
-          className="glass-card shadow-lg p-3 max-w-md z-50"
-        >
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigator.clipboard.writeText(content)
-                }}
-                className="p-1 hover:bg-white/10 rounded transition-colors"
-                title={`Copy ${label}`}
-              >
-                <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-              </button>
-            </div>
-            <div className={`text-xs ${isPassword ? 'font-mono' : ''} text-foreground break-all glass p-2 rounded border border-white/5`}>
-              {content}
-            </div>
+          <div className={`text-xs ${isPassword ? 'font-mono' : ''} text-foreground break-all glass p-2 rounded border border-white/5`}>
+            {content}
           </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -258,8 +252,9 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
   }
 
   return (
-    <div className="space-y-4">
-      {/* Search Bar Section */}
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-4">
+        {/* Search Bar Section */}
       <div className="space-y-3">
         <div className="text-sm text-muted-foreground">
           Found {deviceCredentials.length} credentials for this device
@@ -373,6 +368,7 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
           </Button>
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
