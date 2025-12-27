@@ -144,3 +144,17 @@ export function withRateLimit(handler: (request: NextRequest) => Promise<NextRes
     return response
   }
 }
+
+// Function to satisfy middleware import
+export async function rateLimit(
+  request: NextRequest,
+  config?: { limit?: number; window?: number }
+): Promise<{ success: boolean; reset: number; limit: number; remaining: number }> {
+  const result = rateLimiter.check(request)
+  return {
+    success: result.allowed,
+    reset: Math.ceil((result.resetTime - Date.now()) / 1000),
+    limit: result.limit,
+    remaining: result.remaining
+  }
+}
