@@ -20,7 +20,6 @@ interface GeoData {
 
 export function GeoMap() {
   const [data, setData] = useState<GeoData[]>([]);
-  const [tooltipContent, setTooltipContent] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,11 +61,16 @@ export function GeoMap() {
   }, [data]);
 
   // Determine max value for color scaling
-  const maxCount = Math.max(1, ...data.map((d) => d.count));
+  const maxCount = useMemo(() => Math.max(1, ...data.map((d) => d.count)), [data]);
 
-   const colorScale = scaleLinear()
-    .domain([0, maxCount])
-    .range(["#EAEAEC", "#EF4444"]); // Light gray to Red-500
+  // ⚡ Bolt: Memoize color scale to prevent recreation on every render
+  const colorScale = useMemo(
+    () =>
+      scaleLinear()
+        .domain([0, maxCount])
+        .range(["#EAEAEC", "#EF4444"]), // Light gray to Red-500
+    [maxCount]
+  );
 
   return (
     <div className="w-full h-[500px] border rounded-xl overflow-hidden bg-card relative flex flex-col">
@@ -103,12 +107,7 @@ export function GeoMap() {
                                 hover: { fill: "#3b82f6", outline: "none", cursor: "pointer" },
                                 pressed: { outline: "none" },
                             }}
-                            onMouseEnter={() => {
-                                setTooltipContent(`${countryName}: ${count} devices`);
-                            }}
-                            onMouseLeave={() => {
-                                setTooltipContent("");
-                            }}
+                            // ⚡ Bolt: Removed onMouseEnter/Leave state updates that caused full map re-render
                             data-tooltip-id="geo-tooltip"
                             data-tooltip-content={`${countryName}: ${count} devices`}
                         />
