@@ -68,16 +68,16 @@ export function LinkGraph({ deviceId }: LinkGraphProps) {
 
       {/* Controls */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-         <Button variant="secondary" size="icon" onClick={() => setIsFullscreen(!isFullscreen)} title="Toggle Fullscreen">
+         <Button variant="secondary" size="icon" onClick={() => setIsFullscreen(!isFullscreen)} title="Toggle Fullscreen" aria-label={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}>
             {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
          </Button>
-         <Button variant="secondary" size="icon" onClick={handleZoomIn} title="Zoom In">
+         <Button variant="secondary" size="icon" onClick={handleZoomIn} title="Zoom In" aria-label="Zoom In">
             <ZoomIn className="h-4 w-4" />
          </Button>
-         <Button variant="secondary" size="icon" onClick={handleZoomOut} title="Zoom Out">
+         <Button variant="secondary" size="icon" onClick={handleZoomOut} title="Zoom Out" aria-label="Zoom Out">
             <ZoomOut className="h-4 w-4" />
          </Button>
-         <Button variant="secondary" size="icon" onClick={handleCenter} title="Center Graph">
+         <Button variant="secondary" size="icon" onClick={handleCenter} title="Center Graph" aria-label="Center Graph">
             <RefreshCw className="h-4 w-4" />
          </Button>
       </div>
