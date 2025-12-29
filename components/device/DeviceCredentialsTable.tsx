@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react"
-import { Monitor, Globe, User, Lock, Eye, EyeOff, Copy } from "lucide-react"
+import { Monitor, Globe, User, Lock, Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { CopyButton } from "@/components/ui/copy-button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -89,23 +90,18 @@ const UrlCell = ({ url }: { url: string }) => {
             {url}
           </div>
         </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
+        <TooltipContent
+          side="top"
           className="glass-card shadow-lg p-3 max-w-md z-50"
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-muted-foreground">Full URL</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigator.clipboard.writeText(url)
-                }}
-                className="p-1 hover:bg-white/10 rounded transition-colors"
-                title="Copy URL"
-              >
-                <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-              </button>
+              <CopyButton
+                value={url}
+                label="Copy URL"
+                className="h-5 w-5 hover:bg-white/10"
+              />
             </div>
             <div className="text-xs font-mono text-foreground break-all glass p-2 rounded border border-white/5">
               {url}
@@ -118,54 +114,57 @@ const UrlCell = ({ url }: { url: string }) => {
 }
 
 // Copyable Cell Component with hover effect and copy functionality
-const CopyableCell = ({ 
-  content, 
-  label, 
+const CopyableCell = ({
+  content,
+  label,
   isPassword = false,
   maxLength,
-  children
-}: { 
+  children,
+}: {
   content: string
   label: string
   isPassword?: boolean
   maxLength?: number
   children?: React.ReactNode
 }) => {
-  const displayContent = maxLength && content.length > maxLength ? `${content.substring(0, maxLength)}...` : content
+  const displayContent =
+    maxLength && content.length > maxLength
+      ? `${content.substring(0, maxLength)}...`
+      : content
 
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="cursor-pointer hover:bg-white/5 rounded px-1 py-0.5 transition-colors w-full block truncate">
-            {children || (
-              isPassword ? (
+            {children ||
+              (isPassword ? (
                 <span className="font-mono text-foreground">{displayContent}</span>
               ) : (
                 <span className="text-foreground">{displayContent}</span>
-              )
-            )}
+              ))}
           </div>
         </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
+        <TooltipContent
+          side="top"
           className="glass-card shadow-lg p-3 max-w-md z-50"
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigator.clipboard.writeText(content)
-                }}
-                className="p-1 hover:bg-white/10 rounded transition-colors"
-                title={`Copy ${label}`}
-              >
-                <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
-              </button>
+              <span className="text-xs font-semibold text-muted-foreground">
+                {label}
+              </span>
+              <CopyButton
+                value={content}
+                label={`Copy ${label}`}
+                className="h-5 w-5 hover:bg-white/10"
+              />
             </div>
-            <div className={`text-xs ${isPassword ? 'font-mono' : ''} text-foreground break-all glass p-2 rounded border border-white/5`}>
+            <div
+              className={`text-xs ${
+                isPassword ? "font-mono" : ""
+              } text-foreground break-all glass p-2 rounded border border-white/5`}
+            >
               {content}
             </div>
           </div>
