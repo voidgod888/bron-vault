@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react"
 import { Package, Filter } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { CopyButton } from "@/components/ui/copy-button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -28,22 +29,31 @@ const HoverableCell = ({
   maxLength?: number
   children?: React.ReactNode
 }) => {
-  const displayContent = maxLength && content.length > maxLength ? `${content.substring(0, maxLength)}...` : content
+  const displayContent =
+    maxLength && content.length > maxLength
+      ? `${content.substring(0, maxLength)}...`
+      : content
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="cursor-default hover:bg-white/5 rounded px-1 py-0.5 transition-colors">
+          <div className="cursor-default hover:bg-white/5 rounded px-1 py-0.5 transition-colors group">
             {children || <span className="text-foreground">{displayContent}</span>}
           </div>
         </TooltipTrigger>
         <TooltipContent
           side="top"
-          className="max-w-xs break-all glass-card shadow-lg p-3"
+          className="max-w-xs break-all glass-card shadow-lg p-3 flex items-start gap-2"
         >
-          <div className="font-mono text-xs select-text text-foreground">{content}</div>
-          <div className="text-xs text-muted-foreground mt-1">Highlight text to copy manually</div>
+          <div className="font-mono text-xs select-text text-foreground">
+            {content}
+          </div>
+          <CopyButton
+            value={content}
+            label="Copy text"
+            className="h-5 w-5 shrink-0 hover:bg-white/10"
+          />
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
