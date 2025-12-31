@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { LoadingTable } from "@/components/ui/loading"
 
 interface Credential {
   browser: string | null
@@ -103,6 +104,8 @@ const UrlCell = ({ url }: { url: string }) => {
                 }}
                 className="p-1 hover:bg-white/10 rounded transition-colors"
                 title="Copy URL"
+                aria-label="Copy URL"
+                type="button"
               >
                 <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
               </button>
@@ -161,6 +164,8 @@ const CopyableCell = ({
                 }}
                 className="p-1 hover:bg-white/10 rounded transition-colors"
                 title={`Copy ${label}`}
+                aria-label={`Copy ${label}`}
+                type="button"
               >
                 <Copy className="h-3 w-3 text-muted-foreground hover:text-blue-500" />
               </button>
@@ -230,8 +235,8 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
 
   if (isLoadingCredentials) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <p className="text-xs text-foreground">Loading credentials...</p>
+      <div className="glass-card rounded-lg p-4">
+        <LoadingTable rows={5} columns={4} />
       </div>
     )
   }
@@ -273,6 +278,7 @@ export function DeviceCredentialsTable({ deviceId }: DeviceCredentialsTableProps
               value={credentialsSearchQuery}
               onChange={(e) => setCredentialsSearchQuery(e.target.value)}
               className="w-full h-9 text-sm glass-card border-border/50 text-foreground placeholder:text-muted-foreground"
+              aria-label="Search credentials"
             />
           </div>
           <Button
