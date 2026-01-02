@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
 import { validateRequest } from "@/lib/auth";
+import { getOrSetCache } from "@/lib/redis";
 
 interface SoftwareData {
   software_name: string;
@@ -16,62 +17,34 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Check cache first (analytics_cache remains in MySQL - operational table)
-    const cacheResult = (await executeQuery(
-      "SELECT cache_data FROM analytics_cache WHERE cache_key = 'software_analysis' AND expires_at > NOW()"
-    )) as any[]
+    const result = await getOrSetCache("software_analysis", 600, async () => {
+        // Query to get software grouped by name and version for attack surface management
+        // SingleStore: COUNT(DISTINCT device_id)
+        const results = await executeQuery(`
+          SELECT software_name, version, COUNT(DISTINCT device_id) as count
+          FROM software
+          WHERE software_name IS NOT NULL AND software_name != ''
+          GROUP BY software_name, version
+          ORDER BY count DESC, software_name, version
+          LIMIT 10
+        `) as any[];
 
-    if (Array.isArray(cacheResult) && cacheResult.length > 0) {
-      const cached = cacheResult[0].cache_data
-      let parsed: any = null
-
-      try {
-        if (typeof cached === "string") {
-          parsed = JSON.parse(cached)
-        } else if (typeof cached === "object" && cached !== null) {
-          parsed = cached
+        if (!Array.isArray(results)) {
+           throw new Error("Invalid data format from DB");
         }
-      } catch (e) {
-        console.warn("Software analysis cache parse failed, will recalc")
-      }
 
-      if (parsed && parsed.success && parsed.softwareAnalysis) {
-        return NextResponse.json(parsed)
-      }
-    }
+        // Convert to array format
+        const softwareAnalysis: SoftwareData[] = results.map((row) => ({
+          software_name: row.software_name,
+          version: row.version,
+          count: row.count
+        }));
 
-    // Query to get software grouped by name and version for attack surface management
-    // SingleStore: COUNT(DISTINCT device_id)
-    const results = await executeQuery(`
-      SELECT software_name, version, COUNT(DISTINCT device_id) as count
-      FROM software 
-      WHERE software_name IS NOT NULL AND software_name != ''
-      GROUP BY software_name, version
-      ORDER BY count DESC, software_name, version
-      LIMIT 10
-    `) as any[];
-
-    if (!Array.isArray(results)) {
-      return NextResponse.json({ success: false, error: "Invalid data format" }, { status: 500 });
-    }
-
-    // Convert to array format
-    const softwareAnalysis: SoftwareData[] = results.map((row) => ({
-      software_name: row.software_name,
-      version: row.version,
-      count: row.count
-    }));
-
-    const result = { 
-      success: true, 
-      softwareAnalysis 
-    };
-
-    // Cache for 10 minutes
-    await executeQuery(
-      "INSERT INTO analytics_cache (cache_key, cache_data, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE)) ON DUPLICATE KEY UPDATE cache_data = VALUES(cache_data), expires_at = VALUES(expires_at)",
-      ["software_analysis", JSON.stringify(result)]
-    );
+        return {
+          success: true,
+          softwareAnalysis
+        };
+    });
 
     return NextResponse.json(result);
 

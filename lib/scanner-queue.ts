@@ -1,18 +1,7 @@
-import Redis from "ioredis"
+import redis from "./redis"
 
-const REDIS_HOST = process.env.REDIS_HOST || "localhost"
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379")
-
-const redis = new Redis({
-  host: REDIS_HOST,
-  port: REDIS_PORT,
-  lazyConnect: true // Don't connect immediately, wait for first use
-})
-
-// Log connection errors
-redis.on("error", (err) => {
-  console.error("Redis Client Error:", err)
-})
+// Reuse the singleton connection from lib/redis
+// This ensures we don't open multiple connections and use consistent config
 
 export async function pushToScannerQueue(domain: string, priority: "high" | "low" = "low") {
   try {
