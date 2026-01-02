@@ -74,21 +74,21 @@ export async function GET(request: NextRequest) {
     try {
       [
         deviceStatsResult,
-      fileCountResult,
-      aggregatedStatsResult,
-      topPasswordsResult,
-      recentDevicesResult,
-      batchStatsResult
-    ] = await Promise.all([
+        fileCountResult,
+        aggregatedStatsResult,
+        topPasswordsResult,
+        recentDevicesResult,
+        batchStatsResult
+      ] = await Promise.all([
         // SingleStore: Count devices (unique device_id due to Shard Key)
         executeQuery(`
           SELECT 
             COUNT(*) as total_devices,
             COUNT(DISTINCT device_name_hash) as unique_devices
           FROM devices
-        `),
+        `) as Promise<any[]>,
         // SingleStore: Count files
-        executeQuery("SELECT COUNT(*) as count FROM files WHERE is_directory = 0"),
+        executeQuery("SELECT COUNT(*) as count FROM files WHERE is_directory = 0") as Promise<any[]>,
         // SingleStore: Sum aggregations
         executeQuery(`
         SELECT 
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
             sum(total_domains) as total_domains,
             sum(total_urls) as total_urls
         FROM devices
-      `),
+      `) as Promise<any[]>,
         // SingleStore: Top passwords query
         // Cleaned up logic for standard SQL
         executeQuery(`
@@ -110,14 +110,14 @@ export async function GET(request: NextRequest) {
         GROUP BY password
         ORDER BY total_count DESC, password ASC
         LIMIT 5
-      `),
+      `) as Promise<any[]>,
         // SingleStore: Recent devices
         executeQuery(`
         SELECT device_id, device_name, upload_batch, upload_date, total_files, total_credentials, total_domains, total_urls
         FROM devices 
         ORDER BY upload_date DESC 
         LIMIT 10
-      `),
+      `) as Promise<any[]>,
         // SingleStore: Batch stats
         executeQuery(`
         SELECT 
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
         GROUP BY upload_batch 
         ORDER BY upload_date DESC 
         LIMIT 10
-      `)
+      `) as Promise<any[]>
     ])
     } catch (error) {
       console.error("❌ Error executing SingleStore queries:", error)

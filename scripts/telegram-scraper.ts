@@ -90,7 +90,7 @@ export class TelegramScraper {
       const fileBuffer = await fs.promises.readFile(filePath)
 
       // Open RAR using node-unrar-js
-      const extractor = await createExtractorFromData({ data: fileBuffer })
+      const extractor = await createExtractorFromData({ data: fileBuffer.buffer })
       const list = extractor.getFileList()
       const files = [...list.fileHeaders] // Consume iterator
 

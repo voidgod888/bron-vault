@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { validateRequest } from "./lib/auth"
-import { rateLimit } from "./lib/rate-limiter"
+import { rateLimiter } from "./lib/rate-limiter"
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Rate Limiting for Auth Endpoints
   if (pathname.startsWith('/api/auth/')) {
-    const result = await rateLimit(request, { limit: 10, window: 60 }) // 10 requests per minute
-    if (!result.success) {
+    const result = rateLimiter.check(request) // 10 requests per minute
+    if (!result.allowed) {
       return NextResponse.json(
-        { error: 'Too many requests', retryAfter: result.reset },
-        { status: 429, headers: { 'Retry-After': result.reset.toString() } }
+        { error: 'Too many requests', retryAfter: result.resetTime },
+        { status: 429, headers: { 'Retry-After': result.resetTime.toString() } }
       )
     }
   }
