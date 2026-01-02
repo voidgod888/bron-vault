@@ -45,6 +45,8 @@ export async function middleware(request: NextRequest) {
         // If page request, redirect to login
         const url = request.nextUrl.clone()
         url.pathname = '/login'
+        // Preserve the original URL to redirect back after login
+        url.searchParams.set('callbackUrl', request.nextUrl.pathname)
         return NextResponse.redirect(url)
       }
     }
