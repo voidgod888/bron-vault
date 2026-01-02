@@ -1,29 +1,37 @@
 /** @type {import('next').NextConfig} */
 import { z } from "zod";
+import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
 
-// Validate environment variables at build/start time
-const envSchema = z.object({
-  DATABASE_HOST: z.string().min(1),
-  DATABASE_USER: z.string().min(1),
-  DATABASE_NAME: z.string().min(1),
-  // REDIS_URL is required for rate limiting and queues
-  REDIS_URL: z.string().url(),
-  // JWT_SECRET is required for auth
-  JWT_SECRET: z.string().min(1),
-});
+// Validate environment variables
+// We export this logic to use it conditionally
+const validateEnv = () => {
+  const envSchema = z.object({
+    DATABASE_HOST: z.string().min(1),
+    DATABASE_USER: z.string().min(1),
+    DATABASE_NAME: z.string().min(1),
+    // REDIS_URL is required for rate limiting and queues
+    REDIS_URL: z.string().url(),
+    // JWT_SECRET is required for auth
+    JWT_SECRET: z.string().min(1),
+  });
 
-// Only validate in production or when not in build phase to allow building without all envs if needed?
-// Usually for production builds we want strict validation.
-if (process.env.NODE_ENV === "production") {
-  const parsed = envSchema.safeParse(process.env);
-  if (!parsed.success) {
-    console.error("❌ Invalid environment variables:", parsed.error.format());
-    // process.exit(1); // Don't exit here, let the build fail naturally or throw error
-    throw new Error("Invalid environment variables");
+  if (process.env.NODE_ENV === "production") {
+    const parsed = envSchema.safeParse(process.env);
+    if (!parsed.success) {
+      console.error("❌ Invalid environment variables:", parsed.error.format());
+      throw new Error("Invalid environment variables");
+    }
   }
-}
+};
 
-const nextConfig = {
+export default (phase) => {
+  // Skip validation during the build phase (e.g. Docker build)
+  // because we don't want to bake secrets into the image.
+  if (phase !== PHASE_PRODUCTION_BUILD) {
+    validateEnv();
+  }
+
+  const nextConfig = {
     output: "standalone",
     eslint: {
         ignoreDuringBuilds: true,
@@ -92,6 +100,7 @@ const nextConfig = {
 
         return config;
     },
-};
+  };
 
-export default nextConfig;
+  return nextConfig;
+};
