@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { LoadingTable } from "@/components/ui/loading"
 
 interface Software {
   software_name: string
@@ -131,8 +132,8 @@ export function DeviceSoftwareTable({ deviceId }: DeviceSoftwareTableProps) {
 
   if (isLoadingSoftware) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <p className="text-xs text-foreground">Loading software...</p>
+      <div className="glass-card rounded-lg p-4">
+        <LoadingTable rows={5} columns={2} />
       </div>
     )
   }
