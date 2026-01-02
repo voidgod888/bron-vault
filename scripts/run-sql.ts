@@ -1,20 +1,16 @@
 import mysql from "mysql2/promise"
 import fs from "fs"
 import path from "path"
-
-const dbConfig = {
-  host: process.env.MYSQL_HOST || "localhost",
-  port: Number.parseInt(process.env.MYSQL_PORT || "3306"),
-  user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASSWORD || "",
-  database: process.env.MYSQL_DATABASE || "bronvaultnew",
-  multipleStatements: true, // Needed for running SQL files with multiple statements
-}
+import { dbConfig } from "../lib/db"
 
 export async function runSqlFile(filePath: string) {
   try {
     const sql = fs.readFileSync(filePath, "utf8")
-    const connection = await mysql.createConnection(dbConfig)
+    // Use the imported config but ensure multipleStatements is true
+    const connection = await mysql.createConnection({
+        ...dbConfig,
+        multipleStatements: true
+    })
 
     console.log(`Running SQL from ${filePath}...`)
     await connection.query(sql)

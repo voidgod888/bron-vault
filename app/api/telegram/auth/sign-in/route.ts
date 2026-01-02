@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateRequest } from "@/lib/auth";
 import { settingsManager, SETTING_KEYS } from "@/lib/settings";
-import { authClients } from "@/lib/telegram-auth-state";
+import { authState } from "@/lib/telegram-auth-state";
+import { TelegramClient } from "telegram";
+import { StringSession } from "telegram/sessions";
 
 export async function POST(request: NextRequest) {
   const user = await validateRequest(request);
@@ -20,14 +22,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = authClients.get(phone);
-
-    if (!client) {
+    // Retrieve state from Redis
+    const savedState = await authState.get(phone);
+    if (!savedState || savedState.phoneCodeHash !== phoneCodeHash) {
       return NextResponse.json(
         { success: false, error: "Auth session expired or not found. Please try again." },
         { status: 400 }
       );
     }
+
+    // Reconstruct client from session string
+    const apiId = await settingsManager.getSetting(SETTING_KEYS.TELEGRAM_API_ID);
+    const apiHash = await settingsManager.getSetting(SETTING_KEYS.TELEGRAM_API_HASH);
+
+    if (!apiId || !apiHash) {
+        return NextResponse.json({ success: false, error: "Configuration lost. Please try again." }, { status: 500 });
+    }
+
+    const client = new TelegramClient(
+        new StringSession(savedState.sessionString),
+        Number(apiId),
+        apiHash,
+        { connectionRetries: 5 }
+    );
+
+    await client.connect();
 
     // Sign in
     const { Api } = await import("telegram/tl");
@@ -45,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     // Clean up
     await client.disconnect();
-    authClients.delete(phone);
+    await authState.delete(phone);
 
     return NextResponse.json({ success: true });
   } catch (error) {

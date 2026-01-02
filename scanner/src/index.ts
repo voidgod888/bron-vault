@@ -23,13 +23,18 @@ const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
 
 // SingleStore (MySQL compatible) configuration
+// Matches ../lib/db.ts
 const MYSQL_CONFIG: PoolOptions = {
-  host: process.env.MYSQL_HOST || 'localhost',
-  user: process.env.MYSQL_USER || 'root',
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
+  host: process.env.MYSQL_HOST || '127.0.0.1',
   port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-  flags: ['-FOUND_ROWS']
+  user: process.env.MYSQL_USER || 'root',
+  password: process.env.MYSQL_PASSWORD || '',
+  database: process.env.MYSQL_DATABASE || 'stealer_logs',
+  charset: 'utf8mb4',
+  waitForConnections: true,
+  connectionLimit: 50,
+  queueLimit: 0,
+  flags: ['-FOUND_ROWS'] // SingleStore specific
 };
 
 // Top ports to scan

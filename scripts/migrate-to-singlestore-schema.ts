@@ -16,6 +16,7 @@ import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import mysql from 'mysql2/promise';
+import { dbConfig } from "../lib/db";
 
 // Load .env.local or .env
 async function loadEnv() {
@@ -49,12 +50,7 @@ let pool: mysql.Pool;
 async function getPool() {
   if (!pool) {
     pool = mysql.createPool({
-      host: process.env.MYSQL_HOST || "127.0.0.1",
-      port: Number.parseInt(process.env.MYSQL_PORT || "3306"),
-      user: process.env.MYSQL_USER || "root",
-      password: process.env.MYSQL_PASSWORD || "",
-      database: process.env.MYSQL_DATABASE || "stealer_logs",
-      charset: "utf8mb4",
+      ...dbConfig,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
