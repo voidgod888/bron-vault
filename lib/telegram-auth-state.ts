@@ -13,9 +13,8 @@ const AUTH_TTL = 300; // 5 minutes
 
 export const authState = {
   set: async (phone: string, data: AuthState) => {
-    await redis.set(`${REDIS_PREFIX}${phone}`, JSON.stringify(data), {
-      EX: AUTH_TTL,
-    });
+    // ioredis syntax: set(key, value, 'EX', seconds)
+    await redis.set(`${REDIS_PREFIX}${phone}`, JSON.stringify(data), 'EX', AUTH_TTL);
   },
 
   get: async (phone: string): Promise<AuthState | null> => {

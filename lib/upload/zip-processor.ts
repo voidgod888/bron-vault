@@ -10,6 +10,7 @@ import {
   type ZipStructureInfo,
 } from "./zip-structure-analyzer"
 import { processDevice, type DeviceProcessingResult } from "./device-processor"
+import redis from "@/lib/redis"
 
 export interface ProcessingResult {
   devicesFound: number
@@ -229,9 +230,8 @@ export async function processZipWithBinaryStorage(
     logWithBroadcast(`   - Total binary files saved: ${totalBinaryFiles}`, "info")
     logWithBroadcast(`   - Password handling: Enhanced with special character support`, "info")
 
-    // Clear all analytics cache to ensure fresh data after upload
-    // This ensures users see new data immediately, not cached old data
-    await executeQuery("DELETE FROM analytics_cache WHERE cache_key IN ('stats_main', 'browser_analysis', 'software_analysis', 'top_tlds')")
+    // Invalidate Redis cache instead of deleting from analytics_cache table
+    await redis.del('stats_main', 'browser_analysis', 'software_analysis', 'top_tlds');
 
     return {
       devicesFound,
