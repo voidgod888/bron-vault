@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { logWarn } from './logger'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production'
 
@@ -109,12 +110,25 @@ export function getTokenFromRequest(request: NextRequest): string | null {
 }
 
 export async function validateRequest(request: NextRequest): Promise<JWTPayload | null> {
+  // Check if auth is disabled
+  // This is used for local development or when we want to bypass auth for testing
+  // It aligns with the middleware's logic to prevent 401 loops when auth is disabled
+  if (process.env.NEXT_PUBLIC_ENABLE_AUTH === 'false') {
+    return { userId: 'admin', username: 'admin' }
+  }
+
   const token = getTokenFromRequest(request)
   if (!token) {
+    // Only log if we expect auth to be present but it's not (optional)
+    // logWarn('[Auth] No token found in request')
     return null
   }
 
-  return await verifyToken(token)
+  const payload = await verifyToken(token)
+  if (!payload) {
+    logWarn('[Auth] Token verification failed', { url: request.url })
+  }
+  return payload
 }
 
 export class AuthError extends Error {

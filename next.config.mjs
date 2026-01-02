@@ -2,33 +2,25 @@
 import { z } from "zod";
 import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
 
-// Validate environment variables
-// We export this logic to use it conditionally
-const validateEnv = () => {
-  const envSchema = z.object({
-    DATABASE_HOST: z.string().min(1),
-    DATABASE_USER: z.string().min(1),
-    DATABASE_NAME: z.string().min(1),
-    // REDIS_URL is required for rate limiting and queues
-    REDIS_URL: z.string().url(),
-    // JWT_SECRET is required for auth
-    JWT_SECRET: z.string().min(1),
-  });
+// Validate environment variables at build/start time
+const envSchema = z.object({
+  MYSQL_HOST: z.string().min(1),
+  MYSQL_USER: z.string().min(1),
+  MYSQL_DATABASE: z.string().min(1),
+  // REDIS_URL is required for rate limiting and queues
+  REDIS_URL: z.string().url(),
+  // JWT_SECRET is required for auth
+  JWT_SECRET: z.string().min(1),
+});
 
-  if (process.env.NODE_ENV === "production") {
-    const parsed = envSchema.safeParse(process.env);
-    if (!parsed.success) {
-      console.error("❌ Invalid environment variables:", parsed.error.format());
-      throw new Error("Invalid environment variables");
-    }
-  }
-};
-
-export default (phase) => {
-  // Skip validation during the build phase (e.g. Docker build)
-  // because we don't want to bake secrets into the image.
-  if (phase !== PHASE_PRODUCTION_BUILD) {
-    validateEnv();
+// Only validate in production or when not in build phase to allow building without all envs if needed
+// We skip validation if SKIP_ENV_VALIDATION is set (e.g. during Docker build)
+if (process.env.NODE_ENV === "production" && process.env.SKIP_ENV_VALIDATION !== "1" && process.env.SKIP_ENV_VALIDATION !== "true") {
+  const parsed = envSchema.safeParse(process.env);
+  if (!parsed.success) {
+    console.error("❌ Invalid environment variables:", parsed.error.format());
+    // process.exit(1); // Don't exit here, let the build fail naturally or throw error
+    throw new Error("Invalid environment variables");
   }
 
   const nextConfig = {
@@ -37,11 +29,14 @@ export default (phase) => {
         ignoreDuringBuilds: true,
     },
     images: {
-        domains: ["localhost"],
         remotePatterns: [
             {
                 protocol: "https",
                 hostname: "**",
+            },
+            {
+                protocol: "http",
+                hostname: "localhost",
             },
         ],
     },

@@ -23,7 +23,8 @@ COPY . .
 COPY --from=deps /app/node_modules ./node_modules
 
 # Build the application
-RUN pnpm build
+# Skip env validation during build as we don't have access to .env vars yet
+RUN SKIP_ENV_VALIDATION=1 pnpm build
 
 # Production image, copy all the files and run next
 FROM node:20-alpine AS runner
