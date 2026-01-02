@@ -3,18 +3,18 @@ import { z } from "zod";
 
 // Validate environment variables at build/start time
 const envSchema = z.object({
-  DATABASE_HOST: z.string().min(1),
-  DATABASE_USER: z.string().min(1),
-  DATABASE_NAME: z.string().min(1),
+  MYSQL_HOST: z.string().min(1),
+  MYSQL_USER: z.string().min(1),
+  MYSQL_DATABASE: z.string().min(1),
   // REDIS_URL is required for rate limiting and queues
   REDIS_URL: z.string().url(),
   // JWT_SECRET is required for auth
   JWT_SECRET: z.string().min(1),
 });
 
-// Only validate in production or when not in build phase to allow building without all envs if needed?
-// Usually for production builds we want strict validation.
-if (process.env.NODE_ENV === "production") {
+// Only validate in production or when not in build phase to allow building without all envs if needed
+// We skip validation if SKIP_ENV_VALIDATION is set (e.g. during Docker build)
+if (process.env.NODE_ENV === "production" && process.env.SKIP_ENV_VALIDATION !== "1" && process.env.SKIP_ENV_VALIDATION !== "true") {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     console.error("❌ Invalid environment variables:", parsed.error.format());
