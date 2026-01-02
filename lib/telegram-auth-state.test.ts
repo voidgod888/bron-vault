@@ -30,7 +30,8 @@ describe('telegram-auth-state', () => {
     expect(redis.set).toHaveBeenCalledWith(
       `telegram_auth:${phone}`,
       JSON.stringify(data),
-      { EX: 300 }
+      'EX',
+      300
     );
   });
 
