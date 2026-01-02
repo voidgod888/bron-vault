@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 import { z } from "zod";
+import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
 
 // Validate environment variables at build/start time
 const envSchema = z.object({
@@ -21,9 +22,8 @@ if (process.env.NODE_ENV === "production" && process.env.SKIP_ENV_VALIDATION !==
     // process.exit(1); // Don't exit here, let the build fail naturally or throw error
     throw new Error("Invalid environment variables");
   }
-}
 
-const nextConfig = {
+  const nextConfig = {
     output: "standalone",
     eslint: {
         ignoreDuringBuilds: true,
@@ -95,6 +95,7 @@ const nextConfig = {
 
         return config;
     },
-};
+  };
 
-export default nextConfig;
+  return nextConfig;
+};

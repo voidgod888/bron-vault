@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Reconstruct client from session string
-    const apiId = await settingsManager.getSetting(SETTING_KEYS.TELEGRAM_API_ID);
-    const apiHash = await settingsManager.getSetting(SETTING_KEYS.TELEGRAM_API_HASH);
+    const apiId = await settingsManager.getSetting<string>(SETTING_KEYS.TELEGRAM_API_ID);
+    const apiHash = await settingsManager.getSetting<string>(SETTING_KEYS.TELEGRAM_API_HASH);
 
     if (!apiId || !apiHash) {
         return NextResponse.json({ success: false, error: "Configuration lost. Please try again." }, { status: 500 });

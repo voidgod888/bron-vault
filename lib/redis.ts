@@ -1,22 +1,23 @@
-import { createClient } from 'redis';
+import Redis from 'ioredis';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-const redis = createClient({
-  url: redisUrl,
+// ioredis connects automatically by default
+const redis = new Redis(redisUrl, {
+  lazyConnect: true,
+  // Retry strategy
+  retryStrategy: (times) => {
+    // Stop retrying after 20 times
+    if (times > 20) {
+      return null;
+    }
+    return Math.min(times * 50, 2000);
+  },
+  // Don't crash on error
+  maxRetriesPerRequest: null,
 });
 
 redis.on('error', (err: any) => console.error('Redis Client Error', err));
-
-// Connect immediately
-(async () => {
-    if (!redis.isOpen) {
-        try {
-             await redis.connect();
-        } catch (e) {
-            console.error("Failed to connect to Redis:", e);
-        }
-    }
-})();
+redis.on('connect', () => console.log('Redis Connected'));
 
 export default redis;
