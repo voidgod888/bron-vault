@@ -22,8 +22,9 @@ if (process.env.NODE_ENV === "production" && process.env.SKIP_ENV_VALIDATION !==
     // process.exit(1); // Don't exit here, let the build fail naturally or throw error
     throw new Error("Invalid environment variables");
   }
+}
 
-  const nextConfig = {
+const nextConfig = {
     output: "standalone",
     eslint: {
         ignoreDuringBuilds: true,
@@ -95,7 +96,6 @@ if (process.env.NODE_ENV === "production" && process.env.SKIP_ENV_VALIDATION !==
 
         return config;
     },
-  };
-
-  return nextConfig;
 };
+
+export default nextConfig;
