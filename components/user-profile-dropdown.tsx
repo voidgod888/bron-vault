@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { User, LogOut, Lock, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,11 +70,14 @@ export default function UserProfileDropdown() {
 
   if (!user) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2">
-        <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-          <User className="w-4 h-4 text-muted-foreground" />
-        </div>
-        <span className="text-sm text-muted-foreground">Loading...</span>
+      <div
+        className="flex items-center gap-2 px-3 py-2"
+        role="status"
+        aria-label="Loading user profile"
+      >
+        <Skeleton className="h-8 w-8 rounded-full" />
+        <Skeleton className="h-4 w-24" />
+        <span className="sr-only">Loading user profile...</span>
       </div>
     );
   }
